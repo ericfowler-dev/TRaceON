@@ -1553,7 +1553,7 @@ const BMSAnalyzer = () => {
   const chartData = useMemo(() => {
     if (!filteredData || filteredData.length === 0) return [];
 
-    const maxPts = 300; // Further reduced for better performance (was 400)
+    const maxPts = 600; // Increased for better tooltip detection on large datasets (was 300)
 
     // Use LTTB if data exceeds threshold, otherwise use all data
     const downsampledData = filteredData.length > maxPts
@@ -2225,6 +2225,8 @@ const BMSAnalyzer = () => {
                     shared={true}
                     isAnimationActive={false}
                     allowEscapeViewBox={{ x: true, y: true }}
+                    cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
+                    wrapperStyle={{ zIndex: 1000 }}
                     content={({ active, payload }) => {
                       if (!active || !payload || !payload.length) return null;
                       const data = payload[0].payload;
@@ -2290,8 +2292,6 @@ const BMSAnalyzer = () => {
                         </div>
                       );
                     }}
-                    cursor={{ stroke: '#475569', strokeWidth: 1 }}
-                    wrapperStyle={{ zIndex: 1000 }}
                   />
 
                   {/* Pack Max and Min - Simplified for performance (no glow effects) */}
@@ -2355,7 +2355,7 @@ const BMSAnalyzer = () => {
                     shared={true}
                     isAnimationActive={false}
                     contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: '12px' }}
-                    cursor={{ stroke: '#475569', strokeWidth: 1 }}
+                    cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
                     wrapperStyle={{ zIndex: 1000 }}
                     allowEscapeViewBox={{ x: true, y: true }}
                     content={({ active, payload }) => {
