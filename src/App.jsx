@@ -2222,8 +2222,9 @@ const BMSAnalyzer = () => {
                   ))}
 
                   <Tooltip
-                    trigger="axis"
+                    shared={true}
                     isAnimationActive={false}
+                    allowEscapeViewBox={{ x: true, y: true }}
                     content={({ active, payload }) => {
                       if (!active || !payload || !payload.length) return null;
                       const data = payload[0].payload;
@@ -2303,6 +2304,7 @@ const BMSAnalyzer = () => {
                     name="Pack Max"
                     connectNulls
                     isAnimationActive={false}
+                    activeDot={{ r: 6 }}
                   />
                   <Line
                     type="monotone"
@@ -2313,6 +2315,7 @@ const BMSAnalyzer = () => {
                     name="Pack Min"
                     connectNulls
                     isAnimationActive={false}
+                    activeDot={{ r: 6 }}
                   />
 
                   {/* Individual Cell Lines - Simplified rendering */}
@@ -2349,7 +2352,7 @@ const BMSAnalyzer = () => {
                   <ReferenceLine y={150} label={{ position: 'right', value: 'Warning 150mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
 
                   <Tooltip
-                    trigger="axis"
+                    shared={true}
                     isAnimationActive={false}
                     contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: '12px' }}
                     cursor={{ stroke: '#475569', strokeWidth: 1 }}
@@ -2436,6 +2439,7 @@ const BMSAnalyzer = () => {
                     name="Δ mV (Max-Min)"
                     connectNulls
                     isAnimationActive={false}
+                    activeDot={{ r: 8 }}
                   />
                   {/* Overlay data with conditional colors - this creates the effect */}
                   {zoomedChartData.map((d, i) => {
