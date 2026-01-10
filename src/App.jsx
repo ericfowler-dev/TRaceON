@@ -1726,7 +1726,7 @@ const BMSAnalyzer = () => {
             <>
               {/* TRaceON Logo */}
               <div className="mb-8">
-                <img src="/traceon-logo-psi.png" alt="TRaceON" className="h-24 mx-auto" />
+                <img src="traceon-logo-psi.png" alt="TRaceON" className="h-24 mx-auto" />
               </div>
               <h1 className="text-2xl font-bold text-white mb-3">Battery Management System Analyzer</h1>
               <p className="text-slate-400 mb-6">Drop your Excel file or click to browse</p>
@@ -1752,7 +1752,7 @@ const BMSAnalyzer = () => {
         <div className="w-full px-8 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {/* TRaceON Logo */}
-            <img src="/traceon-logo.png" alt="TRaceON" className="h-10" />
+            <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
             <div className="border-l border-slate-700 pl-4">
               <h1 className="text-lg font-semibold">{fileName}</h1>
               <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)}</p>
