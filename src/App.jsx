@@ -2222,6 +2222,8 @@ const BMSAnalyzer = () => {
                   ))}
 
                   <Tooltip
+                    trigger="axis"
+                    isAnimationActive={false}
                     content={({ active, payload }) => {
                       if (!active || !payload || !payload.length) return null;
                       const data = payload[0].payload;
@@ -2347,6 +2349,8 @@ const BMSAnalyzer = () => {
                   <ReferenceLine y={150} label={{ position: 'right', value: 'Warning 150mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
 
                   <Tooltip
+                    trigger="axis"
+                    isAnimationActive={false}
                     contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: '12px' }}
                     cursor={{ stroke: '#475569', strokeWidth: 1 }}
                     wrapperStyle={{ zIndex: 1000 }}
