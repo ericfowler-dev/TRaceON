@@ -1,0 +1,875 @@
+====================================================================================================
+BMS FILE ANALYSIS
+====================================================================================================
+
+
+====================================================================================================
+FILE 1: 37504A4521063938040A16324E2B100F_20250114114310.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Charging 0x99
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - Balancing state 0x86
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (20027, 67)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open' 'Close']
+  Relay 1: ['Open' 'Close']
+  Relay 2: ['Open']
+  Relay 3: ['Open' 'Close']
+  Relay 4: ['Open' 'Close']
+  Relay 5: ['Close']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+Shape: (20028, 13)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                 Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/1/7 08:58:36                          1           1                  9            25            25            24            23            27            26
+10  2025/1/7 08:59:06                          1           1                  9            25            25            24            23            27            26
+20  2025/1/7 08:59:36                          1           1                  9            25            25            24            23            27            26
+30  2025/1/7 09:00:06                          1           1                  9            25            25            24            23            27            26
+40  2025/1/7 09:00:36                          1           1                  9            25            25            23            23            27            26
+50  2025/1/7 09:01:06                          1           1                  9            25            25            23            23            27            26
+60  2025/1/7 09:01:36                          1           1                  9            25            25            23            23            27            26
+70  2025/1/7 09:02:06                          1           1                  9            25            25            23            23            27            26
+80  2025/1/7 09:02:36                          1           1                  9            25            25            23            23            27            26
+90  2025/1/7 09:03:06                          1           1                  9            25            25            23            23            27            26
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)  CellTemp9(℃)
+count                    20028.0     20028.0            20028.0   20028.00000  20028.000000  20028.000000  20028.000000  20028.000000  20028.000000  20028.000000  20028.000000  20028.000000
+mean                         1.0         1.0                9.0      23.42126     23.974536     21.868534     21.654733     25.448372     24.793190     23.141152     24.091921     21.474436
+std                          0.0         0.0                0.0       1.67763      1.680666      1.687276      1.475275      1.920131      1.958237      1.642485      1.688946      1.549211
+min                          1.0         1.0                9.0      21.00000     22.000000     20.000000     20.000000     23.000000     22.000000     21.000000     22.000000     20.000000
+25%                          1.0         1.0                9.0      22.00000     23.000000     21.000000     21.000000     24.000000     23.000000     22.000000     23.000000     20.000000
+50%                          1.0         1.0                9.0      23.00000     23.000000     21.000000     21.000000     25.000000     24.000000     23.000000     24.000000     21.000000
+75%                          1.0         1.0                9.0      25.00000     25.000000     23.000000     23.000000     27.000000     26.000000     24.000000     26.000000     23.000000
+max                          1.0         1.0                9.0      29.00000     29.000000     27.000000     26.000000     31.000000     31.000000     28.000000     29.000000     26.000000
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (20027, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             5            27                       1             4            23
+1                       1             5            27                       1             4            23
+2                       1             5            27                       1             4            23
+3                       1             5            27                       1             4            23
+4                       1             5            27                       1             4            23
+5                       1             5            27                       1             4            23
+6                       1             5            27                       1             4            23
+7                       1             5            27                       1             4            23
+8                       1             5            27                       1             4            23
+9                       1             5            27                       1             4            23
+
+--- CHARGING 0x99 SHEET ---
+Column names: ['Time', 'Charger conn.', 'Charging elapsed time', 'Charge Req. Volt.(V)', 'Charge Req. Curr.(A)', 'Charger Output Volt.(V)', 'Charger Output Curr.(A)', 'Charger fault stat.', 'S2 state', 'CC Resistance', 'CC2 Resistance', 'CP freq.', 'CP duty', 'Elec. lock state', 'Charger port temp.01', 'Charger port temp.02', 'Charger port temp.03']
+Shape: (3966, 17)
+
+Sample data (first 5 rows):
+                Time Charger conn.  Charging elapsed time  Charge Req. Volt.(V)  Charge Req. Curr.(A)  Charger Output Volt.(V)  Charger Output Curr.(A)  Charger fault stat. S2 state  CC Resistance  CC2 Resistance  CP freq.  CP duty Elec. lock state Charger port temp.01 Charger port temp.02 Charger port temp.03
+0  2025/1/7 08:58:36        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+1  2025/1/7 08:58:39        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+2  2025/1/7 08:58:42        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+3  2025/1/7 08:58:45        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+4  2025/1/7 08:58:48        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (20027, 9)
+
+Sample data (first 5 rows):
+                Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/1/7 08:58:36                                AH                                  1                               1536                          5685                                  AH                                    1                                  1520                             5563
+1  2025/1/7 08:58:39                                AH                                  1                               1536                          5685                                  AH                                    1                                  1520                             5563
+2  2025/1/7 08:58:42                                AH                                  1                               1536                          5685                                  AH                                    1                                  1520                             5563
+3  2025/1/7 08:58:45                                AH                                  1                               1536                          5685                                  AH                                    1                                  1520                             5563
+4  2025/1/7 08:58:48                                AH                                  1                               1536                          5685                                  AH                                    1                                  1520                             5563
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+Shape: (20028, 33)
+
+Number of cell columns: 33
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)    Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)
+count                    20028.0     20028.0   20028.000000  20028.000000     20028.0                             20028.0                   20028.0       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000       20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000        20028.000000
+mean                         1.0         1.0      80.158808     -5.487003        24.0                                 0.0                      24.0        3340.222688        3331.152087        3331.437837        3341.791891        3333.204763        3336.555173        3350.634112        3340.076792        3336.662872        3350.213701         3340.217096         3341.616287         3337.413321         3336.532554         3351.112043         3346.849960         3337.290344         3340.413871         3346.583233         3341.208908         3332.010485         3337.524266         3334.035950         3335.587128
+std                          0.0         0.0       0.811591     47.802263         0.0                                 0.0                       0.0          34.811193          25.720415          25.841414          36.682521          28.248868          30.900364          53.859990          33.430315          31.247115          54.152880           36.714755           34.458041           31.118354           27.631172           51.731768           38.731462           29.786475           35.498223           45.468349           34.450461           26.281690           30.606205           28.027006           29.529425
+min                          1.0         1.0      76.500000   -385.300000        24.0                                 0.0                      24.0        3185.000000        3188.000000        3189.000000        3189.000000        3184.000000        3185.000000        3180.000000        3176.000000        3174.000000        3185.000000         3190.000000         3194.000000         3196.000000         3199.000000         3195.000000         3197.000000         3184.000000         3188.000000         3191.000000         3190.000000         3188.000000         3189.000000         3181.000000         3175.000000
+25%                          1.0         1.0      80.000000      0.000000        24.0                                 0.0                      24.0        3332.000000        3330.000000        3330.000000        3333.000000        3330.000000        3331.000000        3333.000000        3334.000000        3333.000000        3331.000000         3331.000000         3333.000000         3331.000000         3333.000000         3333.000000         3336.000000         3334.000000         3332.000000         3332.000000         3333.000000         3331.000000         3333.000000         3333.000000         3334.000000
+50%                          1.0         1.0      80.000000      0.000000        24.0                                 0.0                      24.0        3333.000000        3331.000000        3331.000000        3333.000000        3331.000000        3332.000000        3333.000000        3335.000000        3334.000000        3332.000000         3331.000000         3334.000000         3331.000000         3333.000000         3334.000000         3337.000000         3334.000000         3332.000000         3333.000000         3334.000000         3331.000000         3333.000000         3333.000000         3335.000000
+75%                          1.0         1.0      80.000000      0.000000        24.0                                 0.0                      24.0        3334.000000        3331.000000        3331.000000        3333.000000        3331.000000        3333.000000        3334.000000        3336.000000        3334.000000        3333.000000         3331.000000         3334.000000         3332.000000         3333.000000         3334.000000         3337.000000         3334.000000         3333.000000         3333.000000         3334.000000         3332.000000         3333.000000         3333.000000         3335.000000
+max                          1.0         1.0      82.700000     99.300000        24.0                                 0.0                      24.0        3446.000000        3422.000000        3422.000000        3447.000000        3428.000000        3436.000000        3559.000000        3450.000000        3442.000000        3555.000000         3446.000000         3441.000000         3431.000000         3427.000000         3533.000000         3461.000000         3437.000000         3446.000000         3493.000000         3444.000000         3423.000000         3436.000000         3430.000000         3437.000000
+
+Global Min: -385.3
+Global Max: 3559.0
+
+
+====================================================================================================
+FILE 2: BMS Log File Example_2.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Charging 0x99
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - Device info. 0x92
+  - Enable&disable data 0x97
+  - Undefined 0xFF
+  - Device list 0x82
+  - List of supported commands 0x91
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (10844, 67)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open' 'Close' 'Sticking']
+  Relay 1: ['Open' 'Close']
+  Relay 2: ['Open' 'Close']
+  Relay 3: ['Open' 'Close']
+  Relay 4: ['Open' 'Close']
+  Relay 5: ['Close']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+Shape: (10845, 13)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                  Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/1/21 11:41:18                          1           1                  9            19            19            18            19            20            19
+10  2025/1/21 11:41:48                          1           1                  9            19            19            18            19            20            19
+20  2025/1/21 11:42:18                          1           1                  9            19            19            18            19            20            19
+30  2025/1/21 11:42:48                          1           1                  9            19            19            18            19            20            19
+40  2025/1/21 11:43:18                          1           1                  9            19            19            18            19            20            19
+50  2025/1/21 11:43:48                          1           1                  9            19            19            18            19            20            19
+60  2025/1/21 11:44:18                          1           1                  9            19            19            18            19            20            19
+70  2025/1/21 11:44:48                          1           1                  9            19            19            18            19            20            19
+80  2025/1/21 11:45:18                          1           1                  9            19            19            18            19            20            19
+90  2025/1/21 11:45:48                          1           1                  9            19            19            18            19            20            19
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)  CellTemp9(℃)
+count                    10845.0     10845.0            10845.0  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000
+mean                         1.0         1.0                9.0     20.699954     21.248409     19.849055     20.172706     22.356570     21.699862     20.808114     21.496081     20.100692
+std                          0.0         0.0                0.0      1.023500      0.996526      0.999627      1.077567      0.928172      1.018822      0.893627      0.875034      1.051165
+min                          1.0         1.0                9.0     19.000000     19.000000     18.000000     18.000000     19.000000     19.000000     18.000000     19.000000     18.000000
+25%                          1.0         1.0                9.0     20.000000     21.000000     19.000000     19.000000     22.000000     21.000000     20.000000     21.000000     19.000000
+50%                          1.0         1.0                9.0     20.000000     21.000000     20.000000     20.000000     22.000000     22.000000     21.000000     22.000000     20.000000
+75%                          1.0         1.0                9.0     21.000000     22.000000     21.000000     21.000000     23.000000     22.000000     21.000000     22.000000     21.000000
+max                          1.0         1.0                9.0     24.000000     25.000000     23.000000     24.000000     25.000000     25.000000     24.000000     24.000000     24.000000
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (10845, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             5            20                       1             3            18
+1                       1             5            20                       1             3            18
+2                       1             5            20                       1             3            18
+3                       1             5            20                       1             3            18
+4                       1             5            20                       1             3            18
+5                       1             5            20                       1             3            18
+6                       1             5            20                       1             3            18
+7                       1             5            20                       1             3            18
+8                       1             5            20                       1             3            18
+9                       1             5            20                       1             3            18
+
+--- CHARGING 0x99 SHEET ---
+Column names: ['Time', 'Charger conn.', 'Charging elapsed time', 'Charge Req. Volt.(V)', 'Charge Req. Curr.(A)', 'Charger Output Volt.(V)', 'Charger Output Curr.(A)', 'Charger fault stat.', 'S2 state', 'CC Resistance', 'CC2 Resistance', 'CP freq.', 'CP duty', 'Elec. lock state', 'Charger port temp.01', 'Charger port temp.02', 'Charger port temp.03']
+Shape: (5188, 17)
+
+Sample data (first 5 rows):
+                 Time Charger conn.  Charging elapsed time  Charge Req. Volt.(V)  Charge Req. Curr.(A)  Charger Output Volt.(V)  Charger Output Curr.(A)  Charger fault stat. S2 state  CC Resistance  CC2 Resistance  CP freq.  CP duty Elec. lock state Charger port temp.01 Charger port temp.02 Charger port temp.03
+0  2025/1/21 11:41:18        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+1  2025/1/21 11:41:21        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+2  2025/1/21 11:41:24        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+3  2025/1/21 11:41:27        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+4  2025/1/21 11:41:30        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (10845, 9)
+
+Sample data (first 5 rows):
+                 Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/1/21 11:41:18                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+1  2025/1/21 11:41:21                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+2  2025/1/21 11:41:24                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+3  2025/1/21 11:41:27                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+4  2025/1/21 11:41:30                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+Shape: (10845, 33)
+
+Number of cell columns: 33
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)    Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)
+count                    10845.0     10845.0   10845.000000  10845.000000     10845.0                             10845.0                   10845.0       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000
+mean                         1.0         1.0      79.804260     -6.223541        24.0                                 0.0                      24.0        3325.759613        3323.330383        3323.418349        3324.633379        3322.949931        3325.088612        3325.034209        3327.918580        3326.171323        3324.623329         3324.588935         3326.514984         3324.336929         3325.889166         3325.831535         3329.815214         3326.973352         3324.954910         3324.669894         3326.330290         3324.358414         3325.806547         3325.934624         3327.301429
+std                          0.0         0.0       0.595051     38.188237         0.0                                 0.0                       0.0          25.161339          24.669945          24.703631          24.716631          24.829674          25.056704          24.950501          25.228658          25.460748          24.671629           24.517433           24.387549           24.244678           24.206913           24.371262           24.360931           25.080647           24.764756           24.833080           24.853208           24.754367           25.026254           25.291810           25.365222
+min                          1.0         1.0      75.700000   -317.800000        24.0                                 0.0                      24.0        3150.000000        3150.000000        3151.000000        3152.000000        3149.000000        3151.000000        3151.000000        3155.000000        3149.000000        3152.000000         3153.000000         3155.000000         3154.000000         3156.000000         3155.000000         3160.000000         3152.000000         3152.000000         3151.000000         3152.000000         3151.000000         3151.000000         3149.000000         3153.000000
+25%                          1.0         1.0      79.800000      0.000000        24.0                                 0.0                      24.0        3326.000000        3325.000000        3325.000000        3326.000000        3324.000000        3326.000000        3326.000000        3328.000000        3328.000000        3326.000000         3326.000000         3328.000000         3326.000000         3327.000000         3327.000000         3331.000000         3328.000000         3326.000000         3326.000000         3328.000000         3326.000000         3327.000000         3327.000000         3329.000000
+50%                          1.0         1.0      79.900000      0.000000        24.0                                 0.0                      24.0        3330.000000        3327.000000        3328.000000        3328.000000        3327.000000        3329.000000        3329.000000        3332.000000        3330.000000        3329.000000         3329.000000         3331.000000         3328.000000         3330.000000         3330.000000         3334.000000         3331.000000         3329.000000         3329.000000         3331.000000         3328.000000         3330.000000         3330.000000         3331.000000
+75%                          1.0         1.0      79.900000      0.000000        24.0                                 0.0                      24.0        3331.000000        3329.000000        3329.000000        3330.000000        3328.000000        3331.000000        3331.000000        3333.000000        3331.000000        3330.000000         3330.000000         3332.000000         3329.000000         3331.000000         3331.000000         3335.000000         3332.000000         3330.000000         3330.000000         3331.000000         3329.000000         3331.000000         3331.000000         3332.000000
+max                          1.0         1.0      81.700000     99.800000        24.0                                 0.0                      24.0        3406.000000        3402.000000        3401.000000        3403.000000        3401.000000        3405.000000        3405.000000        3410.000000        3408.000000        3403.000000         3401.000000         3402.000000         3400.000000         3401.000000         3402.000000         3407.000000         3406.000000         3403.000000         3402.000000         3404.000000         3401.000000         3405.000000         3407.000000         3409.000000
+
+Global Min: -317.8
+Global Max: 3410.0
+
+
+====================================================================================================
+FILE 3: BMS Log File Example_01.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Charging 0x99
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - Device info. 0x92
+  - Enable&disable data 0x97
+  - Undefined 0xFF
+  - Device list 0x82
+  - List of supported commands 0x91
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (10844, 67)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open' 'Close' 'Sticking']
+  Relay 1: ['Open' 'Close']
+  Relay 2: ['Open' 'Close']
+  Relay 3: ['Open' 'Close']
+  Relay 4: ['Open' 'Close']
+  Relay 5: ['Close']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+Shape: (10845, 13)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                  Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/1/21 11:41:18                          1           1                  9            19            19            18            19            20            19
+10  2025/1/21 11:41:48                          1           1                  9            19            19            18            19            20            19
+20  2025/1/21 11:42:18                          1           1                  9            19            19            18            19            20            19
+30  2025/1/21 11:42:48                          1           1                  9            19            19            18            19            20            19
+40  2025/1/21 11:43:18                          1           1                  9            19            19            18            19            20            19
+50  2025/1/21 11:43:48                          1           1                  9            19            19            18            19            20            19
+60  2025/1/21 11:44:18                          1           1                  9            19            19            18            19            20            19
+70  2025/1/21 11:44:48                          1           1                  9            19            19            18            19            20            19
+80  2025/1/21 11:45:18                          1           1                  9            19            19            18            19            20            19
+90  2025/1/21 11:45:48                          1           1                  9            19            19            18            19            20            19
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)  CellTemp9(℃)
+count                    10845.0     10845.0            10845.0  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000  10845.000000
+mean                         1.0         1.0                9.0     20.699954     21.248409     19.849055     20.172706     22.356570     21.699862     20.808114     21.496081     20.100692
+std                          0.0         0.0                0.0      1.023500      0.996526      0.999627      1.077567      0.928172      1.018822      0.893627      0.875034      1.051165
+min                          1.0         1.0                9.0     19.000000     19.000000     18.000000     18.000000     19.000000     19.000000     18.000000     19.000000     18.000000
+25%                          1.0         1.0                9.0     20.000000     21.000000     19.000000     19.000000     22.000000     21.000000     20.000000     21.000000     19.000000
+50%                          1.0         1.0                9.0     20.000000     21.000000     20.000000     20.000000     22.000000     22.000000     21.000000     22.000000     20.000000
+75%                          1.0         1.0                9.0     21.000000     22.000000     21.000000     21.000000     23.000000     22.000000     21.000000     22.000000     21.000000
+max                          1.0         1.0                9.0     24.000000     25.000000     23.000000     24.000000     25.000000     25.000000     24.000000     24.000000     24.000000
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (10845, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             5            20                       1             3            18
+1                       1             5            20                       1             3            18
+2                       1             5            20                       1             3            18
+3                       1             5            20                       1             3            18
+4                       1             5            20                       1             3            18
+5                       1             5            20                       1             3            18
+6                       1             5            20                       1             3            18
+7                       1             5            20                       1             3            18
+8                       1             5            20                       1             3            18
+9                       1             5            20                       1             3            18
+
+--- CHARGING 0x99 SHEET ---
+Column names: ['Time', 'Charger conn.', 'Charging elapsed time', 'Charge Req. Volt.(V)', 'Charge Req. Curr.(A)', 'Charger Output Volt.(V)', 'Charger Output Curr.(A)', 'Charger fault stat.', 'S2 state', 'CC Resistance', 'CC2 Resistance', 'CP freq.', 'CP duty', 'Elec. lock state', 'Charger port temp.01', 'Charger port temp.02', 'Charger port temp.03']
+Shape: (5188, 17)
+
+Sample data (first 5 rows):
+                 Time Charger conn.  Charging elapsed time  Charge Req. Volt.(V)  Charge Req. Curr.(A)  Charger Output Volt.(V)  Charger Output Curr.(A)  Charger fault stat. S2 state  CC Resistance  CC2 Resistance  CP freq.  CP duty Elec. lock state Charger port temp.01 Charger port temp.02 Charger port temp.03
+0  2025/1/21 11:41:18        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+1  2025/1/21 11:41:21        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+2  2025/1/21 11:41:24        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+3  2025/1/21 11:41:27        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+4  2025/1/21 11:41:30        AC Chg                      0                   0.0                     0                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (10845, 9)
+
+Sample data (first 5 rows):
+                 Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/1/21 11:41:18                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+1  2025/1/21 11:41:21                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+2  2025/1/21 11:41:24                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+3  2025/1/21 11:41:27                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+4  2025/1/21 11:41:30                                AH                                  1                                436                           848                                  AH                                    1                                   386                              743
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+Shape: (10845, 33)
+
+Number of cell columns: 33
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)    Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)
+count                    10845.0     10845.0   10845.000000  10845.000000     10845.0                             10845.0                   10845.0       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000       10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000        10845.000000
+mean                         1.0         1.0      79.804260     -6.223541        24.0                                 0.0                      24.0        3325.759613        3323.330383        3323.418349        3324.633379        3322.949931        3325.088612        3325.034209        3327.918580        3326.171323        3324.623329         3324.588935         3326.514984         3324.336929         3325.889166         3325.831535         3329.815214         3326.973352         3324.954910         3324.669894         3326.330290         3324.358414         3325.806547         3325.934624         3327.301429
+std                          0.0         0.0       0.595051     38.188237         0.0                                 0.0                       0.0          25.161339          24.669945          24.703631          24.716631          24.829674          25.056704          24.950501          25.228658          25.460748          24.671629           24.517433           24.387549           24.244678           24.206913           24.371262           24.360931           25.080647           24.764756           24.833080           24.853208           24.754367           25.026254           25.291810           25.365222
+min                          1.0         1.0      75.700000   -317.800000        24.0                                 0.0                      24.0        3150.000000        3150.000000        3151.000000        3152.000000        3149.000000        3151.000000        3151.000000        3155.000000        3149.000000        3152.000000         3153.000000         3155.000000         3154.000000         3156.000000         3155.000000         3160.000000         3152.000000         3152.000000         3151.000000         3152.000000         3151.000000         3151.000000         3149.000000         3153.000000
+25%                          1.0         1.0      79.800000      0.000000        24.0                                 0.0                      24.0        3326.000000        3325.000000        3325.000000        3326.000000        3324.000000        3326.000000        3326.000000        3328.000000        3328.000000        3326.000000         3326.000000         3328.000000         3326.000000         3327.000000         3327.000000         3331.000000         3328.000000         3326.000000         3326.000000         3328.000000         3326.000000         3327.000000         3327.000000         3329.000000
+50%                          1.0         1.0      79.900000      0.000000        24.0                                 0.0                      24.0        3330.000000        3327.000000        3328.000000        3328.000000        3327.000000        3329.000000        3329.000000        3332.000000        3330.000000        3329.000000         3329.000000         3331.000000         3328.000000         3330.000000         3330.000000         3334.000000         3331.000000         3329.000000         3329.000000         3331.000000         3328.000000         3330.000000         3330.000000         3331.000000
+75%                          1.0         1.0      79.900000      0.000000        24.0                                 0.0                      24.0        3331.000000        3329.000000        3329.000000        3330.000000        3328.000000        3331.000000        3331.000000        3333.000000        3331.000000        3330.000000         3330.000000         3332.000000         3329.000000         3331.000000         3331.000000         3335.000000         3332.000000         3330.000000         3330.000000         3331.000000         3329.000000         3331.000000         3331.000000         3332.000000
+max                          1.0         1.0      81.700000     99.800000        24.0                                 0.0                      24.0        3406.000000        3402.000000        3401.000000        3403.000000        3401.000000        3405.000000        3405.000000        3410.000000        3408.000000        3403.000000         3401.000000         3402.000000         3400.000000         3401.000000         3402.000000         3407.000000         3406.000000         3403.000000         3402.000000         3404.000000         3401.000000         3405.000000         3407.000000         3409.000000
+
+Global Min: -317.8
+Global Max: 3410.0
+
+
+====================================================================================================
+FILE 4: BMS Log File Example.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Charging 0x99
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - Balancing state 0x86
+  - Device info. 0x92
+  - Enable&disable data 0x97
+  - Undefined 0xFF
+  - Device list 0x82
+  - List of supported commands 0x91
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Current(A)', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (26326, 68)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open   Close    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open' 'Close']
+  Relay 1: ['Close' 'Open']
+  Relay 2: ['Open']
+  Relay 3: ['Open' 'Close']
+  Relay 4: ['Open']
+  Relay 5: ['Close' 'Open']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)', 'Unnamed: 13', 'Unnamed: 14']
+Shape: (26320, 15)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)', 'CellTemp9(℃)', 'Unnamed: 13', 'Unnamed: 14']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                  Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/3/20 11:48:50                          1           1                  9            25            27            28            40            28            27
+10  2025/3/20 11:49:00                          1           1                  9            25            27            28            40            28            27
+20  2025/3/20 11:49:10                          1           1                  9            25            27            28            40            28            27
+30  2025/3/20 11:49:20                          1           1                  9            25            27            28            40            28            27
+40  2025/3/20 11:49:30                          1           1                  9            25            27            28            40            28            27
+50  2025/3/20 11:49:40                          1           1                  9            25            27            28            41            28            27
+60  2025/3/20 11:49:50                          1           1                  9            25            27            28            41            28            27
+70  2025/3/20 11:50:00                          1           1                  9            25            27            28            41            28            27
+80  2025/3/20 11:50:10                          1           1                  9            25            27            29            41            28            27
+90  2025/3/20 11:50:20                          1           1                  9            25            27            29            41            28            27
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)  CellTemp9(℃)  Unnamed: 13  Unnamed: 14
+count                    26320.0     26320.0            26320.0  26320.000000  26320.000000  26320.000000  26320.000000  26320.000000  26320.000000  26320.000000  26320.000000  26320.000000          0.0          1.0
+mean                         1.0         1.0                9.0     23.566755     25.415160     26.152850     29.701406     27.202812     25.859081     24.291907     26.452660     26.228191          NaN         20.0
+std                          0.0         0.0                0.0      1.855352      2.055931      2.356921      5.128266      2.167528      1.924684      1.876039      2.144084      2.239468          NaN          NaN
+min                          1.0         1.0                9.0     20.000000     21.000000     21.000000     22.000000     23.000000     21.000000     20.000000     22.000000     21.000000          NaN         20.0
+25%                          1.0         1.0                9.0     22.000000     24.000000     24.000000     27.000000     25.000000     24.000000     23.000000     25.000000     24.000000          NaN         20.0
+50%                          1.0         1.0                9.0     24.000000     26.000000     26.000000     29.000000     27.000000     26.000000     25.000000     27.000000     26.000000          NaN         20.0
+75%                          1.0         1.0                9.0     25.000000     27.000000     28.000000     31.000000     29.000000     27.000000     26.000000     28.000000     28.000000          NaN         20.0
+max                          1.0         1.0                9.0     30.000000     32.000000     34.000000     49.000000     34.000000     32.000000     31.000000     33.000000     33.000000          NaN         20.0
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (26318, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             4            40                       1             1            25
+1                       1             4            40                       1             1            25
+2                       1             4            40                       1             1            25
+3                       1             4            40                       1             1            25
+4                       1             4            40                       1             1            25
+5                       1             4            40                       1             1            25
+6                       1             4            40                       1             1            25
+7                       1             4            40                       1             1            25
+8                       1             4            40                       1             1            25
+9                       1             4            40                       1             1            25
+
+--- CHARGING 0x99 SHEET ---
+Column names: ['Time', 'Charger conn.', 'Charging elapsed time', 'Charge Req. Volt.(V)', 'Charge Req. Curr.(A)', 'Charger Output Volt.(V)', 'Charger Output Curr.(A)', 'Charger fault stat.', 'S2 state', 'CC Resistance', 'CC2 Resistance', 'CP freq.', 'CP duty', 'Elec. lock state', 'Charger port temp.01', 'Charger port temp.02', 'Charger port temp.03']
+Shape: (23223, 17)
+
+Sample data (first 5 rows):
+                 Time Charger conn.  Charging elapsed time  Charge Req. Volt.(V)  Charge Req. Curr.(A)  Charger Output Volt.(V)  Charger Output Curr.(A)  Charger fault stat. S2 state  CC Resistance  CC2 Resistance  CP freq.  CP duty Elec. lock state Charger port temp.01 Charger port temp.02 Charger port temp.03
+0  2025/3/20 11:48:50        AC Chg                   3160                  85.2                    90                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+1  2025/3/20 11:48:51        AC Chg                   3161                  85.2                    90                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+2  2025/3/20 11:48:52        AC Chg                   3162                  85.2                    90                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+3  2025/3/20 11:48:53        AC Chg                   3163                  85.2                    90                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+4  2025/3/20 11:48:54        AC Chg                   3164                  85.2                    90                        0                        0                  NaN     Open          65535           65535         0        0         Unlocked              Invalid              Invalid              Invalid
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (26314, 9)
+
+Sample data (first 5 rows):
+                 Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/3/20 11:48:50                                AH                                  1                                 86                          6813                                  AH                                    1                                     0                             6603
+1  2025/3/20 11:48:51                                AH                                  1                                 86                          6813                                  AH                                    1                                     0                             6603
+2  2025/3/20 11:48:52                                AH                                  1                                 86                          6813                                  AH                                    1                                     0                             6603
+3  2025/3/20 11:48:53                                AH                                  1                                 86                          6813                                  AH                                    1                                     0                             6603
+4  2025/3/20 11:48:54                                AH                                  1                                 86                          6813                                  AH                                    1                                     0                             6603
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+Shape: (26323, 33)
+
+Number of cell columns: 33
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)    Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)
+count                    26323.0     26323.0   26323.000000  26323.000000     26323.0                             26323.0                   26323.0       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000       26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000        26323.000000
+mean                         1.0         1.0      80.603051      0.731163        24.0                                 0.0                      24.0        3358.297572        3344.204802        3359.123086        3358.758310        3364.792919        3357.779964        3362.385214        3367.829237        3354.613988        3345.181476         3351.050678         3354.470691         3348.730122         3419.615431         3365.508035         3348.811344         3356.603123         3357.556775         3351.347111         3344.504882         3364.118528         3357.756563         3351.471527         3358.875698
+std                          0.0         0.0       1.291928     91.462670         0.0                                 0.0                       0.0          57.304517          53.752443          54.883418          54.378158          55.996976          53.925262          54.878856          55.142724          48.931048          50.083407           50.935868           51.762784           51.434052           78.448127           55.006033           53.461726           56.778073           55.243903           52.768886           51.767255           55.276660           53.117193           52.538359           53.586364
+min                          1.0         1.0      75.600000   -402.600000        24.0                                 0.0                      24.0        3141.000000        3146.000000        3147.000000        3148.000000        3148.000000        3151.000000        3150.000000        3156.000000        3168.000000        3156.000000         3154.000000         3154.000000         3154.000000         3154.000000         3153.000000         3153.000000         3140.000000         3144.000000         3149.000000         3150.000000         3148.000000         3151.000000         3151.000000         3155.000000
+25%                          1.0         1.0      80.700000      0.000000        24.0                                 0.0                      24.0        3362.000000        3342.000000        3365.000000        3365.000000        3375.000000        3363.000000        3370.000000        3375.000000        3356.000000        3345.000000         3354.000000         3359.000000         3350.000000         3397.000000         3375.000000         3347.000000         3361.000000         3364.000000         3355.000000         3344.000000         3375.000000         3364.000000         3354.000000         3364.000000
+50%                          1.0         1.0      80.800000      0.000000        24.0                                 0.0                      24.0        3365.000000        3344.000000        3369.000000        3367.000000        3378.000000        3365.000000        3373.000000        3379.000000        3359.000000        3347.000000         3356.000000         3361.000000         3352.000000         3456.000000         3378.000000         3349.000000         3363.000000         3367.000000         3358.000000         3345.000000         3378.000000         3367.000000         3357.000000         3367.000000
+75%                          1.0         1.0      81.100000     29.800000        24.0                                 0.0                      24.0        3379.000000        3367.000000        3378.000000        3378.000000        3385.000000        3377.000000        3381.000000        3386.000000        3372.000000        3365.000000         3369.000000         3372.000000         3369.000000         3464.000000         3386.000000         3372.000000         3377.000000         3377.000000         3370.000000         3366.000000         3384.000000         3376.000000         3371.000000         3378.000000
+max                          1.0         1.0      83.200000    100.100000        24.0                                 0.0                      24.0        3483.000000        3456.000000        3470.000000        3468.000000        3474.000000        3467.000000        3472.000000        3489.000000        3470.000000        3450.000000         3452.000000         3456.000000         3453.000000         3563.000000         3472.000000         3464.000000         3480.000000         3470.000000         3461.000000         3453.000000         3467.000000         3461.000000         3460.000000         3475.000000
+
+Global Min: -402.6
+Global Max: 3563.0
+
+
+====================================================================================================
+FILE 5: 34504A45170A31381209163539031C17_20251223085259.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - TMS 0xB5
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - DTU 0x9D
+  - Host diagnostic data 0xC0
+  - Slave diagnostic data 0xC1
+  - Device info. 0x92
+  - Enable&disable data 0x97
+  - Undefined 0xFF
+  - Device list 0x82
+  - List of supported commands 0x91
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (1112, 67)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open']
+  Relay 1: ['Open']
+  Relay 2: ['Open']
+  Relay 3: ['Open' 'Close']
+  Relay 4: ['Open' 'Close']
+  Relay 5: ['Close']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)']
+Shape: (1109, 12)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                   Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/12/18 13:55:16                          1           1                  8            14            14            14            14            13            14
+10  2025/12/18 13:55:26                          1           1                  8            14            14            14            14            13            14
+20  2025/12/18 13:55:36                          1           1                  8            14            14            14            14            13            14
+30  2025/12/18 13:55:46                          1           1                  8            14            14            14            14            13            14
+40  2025/12/18 13:55:56                          1           1                  8            14            14            14            14            13            14
+50  2025/12/18 13:56:06                          1           1                  8            14            14            14            14            13            14
+60  2025/12/18 13:56:16                          1           1                  8            14            14            14            14            13            14
+70  2025/12/18 13:56:26                          1           1                  8            14            14            14            14            13            14
+80  2025/12/18 13:56:36                          1           1                  8            14            14            14            14            13            14
+90  2025/12/18 13:56:46                          1           1                  8            14            14            14            14            13            14
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)
+count                     1109.0      1109.0             1109.0   1109.000000   1109.000000   1109.000000   1109.000000   1109.000000   1109.000000   1109.000000   1109.000000
+mean                         1.0         1.0                8.0     18.755636     18.510370     18.264202     18.221821     18.556357     18.755636     18.755636     18.218215
+std                          0.0         0.0                0.0      2.393353      2.302708      2.180399      2.155807      2.790153      2.393353      2.393353      2.153662
+min                          1.0         1.0                8.0     14.000000     14.000000     14.000000     14.000000     13.000000     14.000000     14.000000     14.000000
+25%                          1.0         1.0                8.0     20.000000     19.000000     19.000000     19.000000     20.000000     20.000000     20.000000     19.000000
+50%                          1.0         1.0                8.0     20.000000     20.000000     19.000000     19.000000     20.000000     20.000000     20.000000     19.000000
+75%                          1.0         1.0                8.0     20.000000     20.000000     20.000000     19.000000     20.000000     20.000000     20.000000     19.000000
+max                          1.0         1.0                8.0     20.000000     20.000000     20.000000     20.000000     20.000000     20.000000     20.000000     20.000000
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (1109, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             1            14                       1             5            13
+1                       1             1            14                       1             5            13
+2                       1             1            14                       1             5            13
+3                       1             1            14                       1             5            13
+4                       1             1            14                       1             5            13
+5                       1             1            14                       1             5            13
+6                       1             1            14                       1             5            13
+7                       1             1            14                       1             5            13
+8                       1             1            14                       1             5            13
+9                       1             1            14                       1             5            13
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (1109, 9)
+
+Sample data (first 5 rows):
+                  Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/12/18 13:55:16                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+1  2025/12/18 13:55:17                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+2  2025/12/18 13:55:18                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+3  2025/12/18 13:55:19                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+4  2025/12/18 13:55:20                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)', 'Cell volt.N+24(mV)', 'Cell volt.N+25(mV)', 'Cell volt.N+26(mV)', 'Cell volt.N+27(mV)', 'Cell volt.N+28(mV)', 'Cell volt.N+29(mV)', 'Cell volt.N+30(mV)', 'Cell volt.N+31(mV)']
+Shape: (1111, 41)
+
+Number of cell columns: 41
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)', 'Cell volt.N+24(mV)', 'Cell volt.N+25(mV)', 'Cell volt.N+26(mV)', 'Cell volt.N+27(mV)', 'Cell volt.N+28(mV)', 'Cell volt.N+29(mV)', 'Cell volt.N+30(mV)', 'Cell volt.N+31(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)  Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)  Cell volt.N+24(mV)  Cell volt.N+25(mV)  Cell volt.N+26(mV)  Cell volt.N+27(mV)  Cell volt.N+28(mV)  Cell volt.N+29(mV)  Cell volt.N+30(mV)
+count                     1111.0      1111.0   1.111000e+03      1111.0      1111.0                              1111.0                    1111.0        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000        1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000         1111.000000
+mean                         1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3342.113411        3340.942394        3341.370837        3341.964896        3341.135914        3341.594059        3341.528353        3344.284428        3405.820882        3350.667867         3401.411341         3392.074707         3404.627363         3427.810081         3378.558056         3402.724572         3365.054905         3364.576058         3391.519352         3398.499550         3374.060306         3393.332133         3378.318632         3374.963096         3369.949595         3353.715572         3343.350135         3394.163816         3389.226823         3371.333933         3395.872187
+std                          0.0         0.0   1.421725e-14         0.0         0.0                                 0.0                       0.0           0.689503           0.749963           0.800459           0.580176           0.730591           0.721560           0.778574           7.159327        1850.303305           6.939406         1597.265262          759.119174         1043.172348           26.076653          495.033778         1704.337534           42.915837          767.632403          543.831233         1850.523204          691.915695         1597.507819          759.532204         1028.688469          675.223167          227.054441          100.307207         1681.622771         1681.680939          667.584417         1643.014851
+min                          1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3340.000000        3339.000000        3340.000000        3340.000000        3340.000000        3340.000000        3340.000000        3343.000000        3350.000000        3120.000000         3353.000000         3368.000000         3373.000000         2560.000000         3362.000000         3351.000000         1936.000000         3340.000000         3375.000000         3342.000000         3353.000000         3344.000000         3354.000000         3343.000000         3349.000000         3346.000000            3.000000         3342.000000         3337.000000         3351.000000         3345.000000
+25%                          1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3342.000000        3340.000000        3341.000000        3342.000000        3341.000000        3341.000000        3341.000000        3344.000000        3350.000000        3351.000000         3353.000000         3369.000000         3373.000000         3428.000000         3363.000000         3351.000000         3366.000000         3341.000000         3375.000000         3343.000000         3353.000000         3345.000000         3355.000000         3344.000000         3349.000000         3347.000000         3346.000000         3343.000000         3339.000000         3351.000000         3346.000000
+50%                          1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3342.000000        3341.000000        3342.000000        3342.000000        3341.000000        3342.000000        3342.000000        3344.000000        3350.000000        3351.000000         3353.000000         3369.000000         3373.000000         3428.000000         3364.000000         3352.000000         3366.000000         3342.000000         3375.000000         3343.000000         3353.000000         3345.000000         3356.000000         3344.000000         3350.000000         3347.000000         3346.000000         3344.000000         3339.000000         3351.000000         3347.000000
+75%                          1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3343.000000        3342.000000        3342.000000        3342.000000        3342.000000        3342.000000        3342.000000        3344.000000        3351.000000        3351.000000         3354.000000         3370.000000         3374.000000         3429.000000         3364.000000         3352.000000         3367.000000         3342.000000         3375.000000         3343.000000         3354.000000         3346.000000         3356.000000         3344.000000         3350.000000         3347.000000         3347.000000         3344.000000         3339.000000         3352.000000         3347.000000
+max                          1.0         1.0   1.073000e+02         0.0        32.0                                 0.0                      32.0        3344.000000        3342.000000        3342.000000        3344.000000        3343.000000        3344.000000        3343.000000        3582.000000       65024.000000        3353.000000        56593.000000        28672.000000        38144.000000         3430.000000        19864.000000        60160.000000         3367.000000        28928.000000        21502.000000        65024.000000        26416.000000        56593.000000        28672.000000        37632.000000        25856.000000        10915.000000         3347.000000        59395.000000        59392.000000        25603.000000        58111.000000
+
+Global Min: 0.0
+Global Max: 65024.0
+
+
+====================================================================================================
+FILE 6: 34504A45170A31381209163539031C17_20251217115303.xlsx
+====================================================================================================
+
+--- SHEET NAMES ---
+  - DTU 0x9D
+  - (Dis)charged time 0x95
+  - System state 0x93
+  - Voltages 0x9A
+  - Temperatures 0x09
+  - Peak data 0x9B
+  - Alarm state 0x87
+  - (Dis)charged energy 0x89
+  - TMS 0xB5
+  - Host diagnostic data 0xC0
+  - Slave diagnostic data 0xC1
+  - Device info. 0x92
+  - Enable&disable data 0x97
+  - Undefined 0xFF
+  - Device list 0x82
+  - List of supported commands 0x91
+
+--- SYSTEM STATE 0x93 SHEET ---
+Column names: ['Time', 'Heartbeat', 'Power volt', 'Reset source', 'Shown SOC（%）', 'Real SOC（%）', 'Integral ratio', 'SOH（%）', 'Sys. insul. resistance(KΩ)', 'Pos. insulation(KΩ)', 'Neg. insulation(KΩ)', 'System state', 'Wake-up signal', 'Acc. voltage(V)', 'HVBPOS(V)', 'HV1(V)', 'HV2(V)', 'HV3(V)', 'HV4(V)', 'HV5(V)', 'DI1', 'DI2', 'SW1', 'SW2', 'Chg Self-Diag Fault', 'Dchg Diag. Fault Flag', 'Dchg Diag. Fault Action', 'Chg GB Comm. Fault', 'Other Chg Fault', 'Dchg Self-Diag Fault', 'Dchg Diag. Fault Flag.1', 'Dchg Diag. Fault Action.1', 'Other Dchg Fault', 'Empty calibration', 'Full calibration', 'Slave communication interruption status', 'HALL Power Supply Voltage（mV）', 'HALL Channel 1 Calibration Current（A）', 'HALL Channel 2 Calibration Current（A）', 'SOC cloud setting count / local setting count', 'SOC parameter error count / upper computer setting count', 'SOC OCV set count', 'Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5', 'BMS high side feedback voltage0', 'BMS high side feedback voltage1', 'BMS high side feedback voltage2', 'BMS high side feedback voltage3', 'BMS high side feedback voltage4', 'BMS high side feedback voltage5', 'P- VOL', 'CC RES', 'CC2 RES', 'FaultFlag', 'Dcharging High Voltage Process Node', 'Charging High Voltage Process Node']
+Shape: (740, 67)
+
+Relay columns found: ['Relay count', 'Relay 0', 'Relay 1', 'Relay 2', 'Relay 3', 'Relay 4', 'Relay 5', 'Relay load cut-off times0', 'Relay load cut-off times1', 'Relay load cut-off times2', 'Relay load cut-off times3', 'Relay load cut-off times4', 'Relay load cut-off times5']
+
+Sample data from relay columns (first 10 rows):
+   Relay count Relay 0 Relay 1 Relay 2 Relay 3 Relay 4 Relay 5  Relay load cut-off times0  Relay load cut-off times1  Relay load cut-off times2  Relay load cut-off times3  Relay load cut-off times4  Relay load cut-off times5
+0            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+1            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+2            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+3            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+4            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+5            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+6            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+7            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+8            6    Open    Open    Open   Close    Open   Close                          0                          0                          0                          0                          0                          0
+9            6    Open    Open    Open    Open    Open   Close                          0                          0                          0                          0                          0                          0
+
+Unique values in relay columns:
+  Relay count: [6]
+  Relay 0: ['Open' 'Close']
+  Relay 1: ['Open']
+  Relay 2: ['Open']
+  Relay 3: ['Close' 'Open']
+  Relay 4: ['Open' 'Close']
+  Relay 5: ['Close']
+  Relay load cut-off times0: [0]
+  Relay load cut-off times1: [0]
+  Relay load cut-off times2: [0]
+  Relay load cut-off times3: [0]
+  Relay load cut-off times4: [0]
+  Relay load cut-off times5: [0]
+
+--- TEMPERATURES 0x09 SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)']
+Shape: (739, 12)
+
+Temperature columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Temp. probe count', 'CellTemp1(℃)', 'CellTemp2(℃)', 'CellTemp3(℃)', 'CellTemp4(℃)', 'CellTemp5(℃)', 'CellTemp6(℃)', 'CellTemp7(℃)', 'CellTemp8(℃)']
+
+Sample temperature data (rows 0, 10, 20, 30, 40, 50, 60, 70, 80, 90):
+                   Time  Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)
+0   2025/12/17 10:30:46                          1           1                  8            18            18            18            18            18            18
+10  2025/12/17 10:30:56                          1           1                  8            18            18            18            18            18            18
+20  2025/12/17 10:31:06                          1           1                  8            18            18            18            18            18            18
+30  2025/12/17 10:31:16                          1           1                  8            18            18            18            18            18            18
+40  2025/12/17 10:31:26                          1           1                  8            18            18            18            18            18            18
+50  2025/12/17 10:31:36                          1           1                  8            18            18            18            18            18            18
+60  2025/12/17 10:31:46                          1           1                  8            18            18            18            18            18            18
+70  2025/12/17 10:31:56                          1           1                  8            18            18            18            18            18            18
+80  2025/12/17 10:32:06                          1           1                  8            18            18            18            18            18            18
+90  2025/12/17 10:32:16                          1           1                  8            18            18            18            18            18            18
+
+Temperature statistics for numeric columns:
+       Rechargable subsys. count  Subsys. ID  Temp. probe count  CellTemp1(℃)  CellTemp2(℃)  CellTemp3(℃)  CellTemp4(℃)  CellTemp5(℃)  CellTemp6(℃)  CellTemp7(℃)  CellTemp8(℃)
+count                      739.0       739.0              739.0         739.0         739.0         739.0         739.0         739.0         739.0         739.0         739.0
+mean                         1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+std                          0.0         0.0                0.0           0.0           0.0           0.0           0.0           0.0           0.0           0.0           0.0
+min                          1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+25%                          1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+50%                          1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+75%                          1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+max                          1.0         1.0                8.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0          18.0
+
+--- PEAK DATA 0x9B SHEET ---
+Column names: ['Time', 'Subsys ID of max volt.', 'Cell ID of max volt.', 'Max cell(mv)', 'Subsys ID of min volt.', 'Cell ID of min. volt.', 'Min cell(mv)', 'Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+Shape: (739, 13)
+
+Temperature-related columns: ['Subsys ID of max temp.', 'Max temp. ID', 'Max temp.(℃)', 'Subsys ID of min temp.', 'Min temp. ID', 'Min temp.(℃)']
+
+Sample data (first 10 rows):
+   Subsys ID of max temp.  Max temp. ID  Max temp.(℃)  Subsys ID of min temp.  Min temp. ID  Min temp.(℃)
+0                       1             1            18                       1             1            18
+1                       1             1            18                       1             1            18
+2                       1             1            18                       1             1            18
+3                       1             1            18                       1             1            18
+4                       1             1            18                       1             1            18
+5                       1             1            18                       1             1            18
+6                       1             1            18                       1             1            18
+7                       1             1            18                       1             1            18
+8                       1             1            18                       1             1            18
+9                       1             1            18                       1             1            18
+
+--- (DIS)CHARGED ENERGY 0x89 SHEET ---
+Column names: ['Time', 'Type for charging energy/capacity', 'Unit for charging energy/capacity', 'This time charged energy/capacity', 'Acc. charged energy/capacity', 'Type for discharged energy/capacity', 'Unit for discharged energy/capacity', 'This time discharged energy/capacity', 'Acc. discharged energy/capacity']
+Shape: (739, 9)
+
+Sample data (first 5 rows):
+                  Time Type for charging energy/capacity  Unit for charging energy/capacity  This time charged energy/capacity  Acc. charged energy/capacity Type for discharged energy/capacity  Unit for discharged energy/capacity  This time discharged energy/capacity  Acc. discharged energy/capacity
+0  2025/12/17 10:30:46                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+1  2025/12/17 10:30:47                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+2  2025/12/17 10:30:48                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+3  2025/12/17 10:30:49                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+4  2025/12/17 10:30:50                                WH                                100                                  0                         14942                                  WH                                  100                                     0                            13939
+
+--- VOLTAGES 0x9A SHEET ---
+Column names: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)', 'Cell volt.N+24(mV)', 'Cell volt.N+25(mV)', 'Cell volt.N+26(mV)', 'Cell volt.N+27(mV)', 'Cell volt.N+28(mV)', 'Cell volt.N+29(mV)', 'Cell volt.N+30(mV)', 'Cell volt.N+31(mV)']
+Shape: (740, 41)
+
+Number of cell columns: 41
+Cell columns: ['Time', 'Rechargable subsys. count', 'Subsys. ID', 'Pack volt.(V)', 'Current(A)', 'Current2(A)', 'Cell count', "This frame's starting cell index N", 'Cell count in this frame', 'Cell volt.N+0(mV)', 'Cell volt.N+1(mV)', 'Cell volt.N+2(mV)', 'Cell volt.N+3(mV)', 'Cell volt.N+4(mV)', 'Cell volt.N+5(mV)', 'Cell volt.N+6(mV)', 'Cell volt.N+7(mV)', 'Cell volt.N+8(mV)', 'Cell volt.N+9(mV)', 'Cell volt.N+10(mV)', 'Cell volt.N+11(mV)', 'Cell volt.N+12(mV)', 'Cell volt.N+13(mV)', 'Cell volt.N+14(mV)', 'Cell volt.N+15(mV)', 'Cell volt.N+16(mV)', 'Cell volt.N+17(mV)', 'Cell volt.N+18(mV)', 'Cell volt.N+19(mV)', 'Cell volt.N+20(mV)', 'Cell volt.N+21(mV)', 'Cell volt.N+22(mV)', 'Cell volt.N+23(mV)', 'Cell volt.N+24(mV)', 'Cell volt.N+25(mV)', 'Cell volt.N+26(mV)', 'Cell volt.N+27(mV)', 'Cell volt.N+28(mV)', 'Cell volt.N+29(mV)', 'Cell volt.N+30(mV)', 'Cell volt.N+31(mV)']
+
+Cell voltage statistics:
+       Rechargable subsys. count  Subsys. ID  Pack volt.(V)  Current(A)  Cell count  This frame's starting cell index N  Cell count in this frame  Cell volt.N+0(mV)  Cell volt.N+1(mV)  Cell volt.N+2(mV)  Cell volt.N+3(mV)  Cell volt.N+4(mV)  Cell volt.N+5(mV)  Cell volt.N+6(mV)  Cell volt.N+7(mV)  Cell volt.N+8(mV)  Cell volt.N+9(mV)  Cell volt.N+10(mV)  Cell volt.N+11(mV)  Cell volt.N+12(mV)  Cell volt.N+13(mV)  Cell volt.N+14(mV)  Cell volt.N+15(mV)  Cell volt.N+16(mV)  Cell volt.N+17(mV)  Cell volt.N+18(mV)  Cell volt.N+19(mV)  Cell volt.N+20(mV)  Cell volt.N+21(mV)  Cell volt.N+22(mV)  Cell volt.N+23(mV)  Cell volt.N+24(mV)  Cell volt.N+25(mV)  Cell volt.N+26(mV)  Cell volt.N+27(mV)  Cell volt.N+28(mV)  Cell volt.N+29(mV)  Cell volt.N+30(mV)  Cell volt.N+31(mV)
+count                      740.0       740.0     740.000000       740.0       740.0                               740.0                     740.0         740.000000         740.000000         740.000000         740.000000         740.000000         740.000000         740.000000         740.000000         740.000000         740.000000          740.000000          740.000000           740.00000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000          740.000000
+mean                         1.0         1.0     107.432297         0.0        32.0                                 0.0                      32.0        3343.614865        3343.254054        3343.920270        3344.131081        3343.218919        3343.978378        3343.952703        3346.990541        3355.858108        3356.006757         3358.372973         3377.681081          3383.22027         3448.352703         3371.377027         3357.252703         3374.733784         3344.001351         3384.624324         3345.152703         3359.325676         3348.664865         3361.702703         3348.114865         3354.421622         3350.648649         3350.851351         3347.009459         3340.482432         3357.512162         3350.756757         3363.937838
+std                          0.0         0.0       0.046793         0.0         0.0                                 0.0                       0.0           0.599093           0.528277           0.285642           0.341701           0.538799           0.206963           0.247708           0.257325           0.419584           0.407916            0.486710            0.486259             0.44917            1.152126            0.519979            0.512027            0.474741            0.168567            0.815581            0.371051            0.513040            0.478052            0.457378            0.335610            0.570419            0.480540            0.355982            0.168307            0.549045            0.526549            0.435589            0.355015
+min                          1.0         1.0     107.400000         0.0        32.0                                 0.0                      32.0        3343.000000        3342.000000        3343.000000        3343.000000        3342.000000        3342.000000        3342.000000        3346.000000        3354.000000        3354.000000         3357.000000         3376.000000          3381.00000         3445.000000         3369.000000         3355.000000         3373.000000         3342.000000         3383.000000         3344.000000         3358.000000         3347.000000         3361.000000         3347.000000         3353.000000         3349.000000         3350.000000         3346.000000         3339.000000         3356.000000         3349.000000         3362.000000
+25%                          1.0         1.0     107.400000         0.0        32.0                                 0.0                      32.0        3343.000000        3343.000000        3344.000000        3344.000000        3343.000000        3344.000000        3344.000000        3347.000000        3356.000000        3356.000000         3358.000000         3377.000000          3383.00000         3448.000000         3371.000000         3357.000000         3374.000000         3344.000000         3384.000000         3345.000000         3359.000000         3348.000000         3361.000000         3348.000000         3354.000000         3350.000000         3351.000000         3347.000000         3340.000000         3357.000000         3351.000000         3364.000000
+50%                          1.0         1.0     107.400000         0.0        32.0                                 0.0                      32.0        3344.000000        3343.000000        3344.000000        3344.000000        3343.000000        3344.000000        3344.000000        3347.000000        3356.000000        3356.000000         3358.000000         3378.000000          3383.00000         3448.000000         3371.000000         3357.000000         3375.000000         3344.000000         3384.000000         3345.000000         3359.000000         3349.000000         3362.000000         3348.000000         3354.000000         3351.000000         3351.000000         3347.000000         3340.000000         3358.000000         3351.000000         3364.000000
+75%                          1.0         1.0     107.500000         0.0        32.0                                 0.0                      32.0        3344.000000        3344.000000        3344.000000        3344.000000        3344.000000        3344.000000        3344.000000        3347.000000        3356.000000        3356.000000         3359.000000         3378.000000          3383.00000         3450.000000         3372.000000         3358.000000         3375.000000         3344.000000         3385.000000         3345.000000         3360.000000         3349.000000         3362.000000         3348.000000         3355.000000         3351.000000         3351.000000         3347.000000         3341.000000         3358.000000         3351.000000         3364.000000
+max                          1.0         1.0     107.500000         0.0        32.0                                 0.0                      32.0        3345.000000        3344.000000        3345.000000        3345.000000        3344.000000        3345.000000        3345.000000        3348.000000        3358.000000        3357.000000         3359.000000         3379.000000          3384.00000         3450.000000         3372.000000         3358.000000         3376.000000         3345.000000         3386.000000         3346.000000         3361.000000         3349.000000         3362.000000         3349.000000         3356.000000         3351.000000         3351.000000         3348.000000         3342.000000         3358.000000         3352.000000         3365.000000
+
+Global Min: 0.0
+Global Max: 3450.0
+
+
+====================================================================================================
+ANALYSIS COMPLETE
+====================================================================================================

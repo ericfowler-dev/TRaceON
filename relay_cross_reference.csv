@@ -1,0 +1,8 @@
+﻿"Item Name,96V230Ah,80V304Ah without 12V AUX,80V304Ah with 12V AUX"
+"Positive Relay,Relay0,Relay0,Relay0"
+"Charging Relay,Relay1,Relay1,Relay1"
+"Heating Relay,Relay2,Relay2,Relay2"
+"Alarm Relay,Relay3,Relay3,/"
+"Pre-charge Relay,Relay4,Relay4,Relay3"
+"Negative Relay,Relay5,Relay5,Relay4"
+"DC/DC Relay,/,/,Relay5"
