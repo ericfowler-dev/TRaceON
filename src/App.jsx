@@ -1553,11 +1553,17 @@ const BMSAnalyzer = () => {
   const chartData = useMemo(() => {
     if (!filteredData || filteredData.length === 0) return [];
 
-    // Don't downsample here - wait until after zoom is applied
-    // This ensures each zoom view gets full resolution
-    console.log(`chartData: Processing ${filteredData.length} raw points`);
+    // Downsample first to 1200 points, then transform
+    // This gives us 300 points per 25% view after zoom slicing
+    const maxPts = 1200;
+    const downsampledData = filteredData.length > maxPts
+      ? lttbDownsample(filteredData, maxPts)
+      : filteredData;
 
-    return filteredData.map(d => {
+    console.log(`chartData: Downsampled to ${downsampledData.length} points (from ${filteredData.length} raw)`);
+
+    // Transform the downsampled data
+    const transformed = downsampledData.map(d => {
       // Build cell voltage object - ensure keys are numeric and map to cell0, cell1, cell2, etc.
       const cellVoltages = {};
       if (d.cells) {
@@ -1598,17 +1604,18 @@ const BMSAnalyzer = () => {
         ...cellVoltages,
         ...temps
       };
-    }).map((entry, idx) => {
-      // Log first entry to verify cell data structure
-      if (idx === 0) {
-        const cellKeys = Object.keys(entry).filter(k => k.startsWith('cell'));
-        console.log(`chartData: First entry has ${cellKeys.length} cell keys:`, cellKeys.slice(0, 5));
-      }
-      return entry;
     });
+
+    // Now return the full transformed dataset - we'll downsample in zoomedChartData
+    if (transformed.length > 0) {
+      const cellKeys = Object.keys(transformed[0]).filter(k => k.startsWith('cell'));
+      console.log(`chartData: Transformed ${transformed.length} entries with ${cellKeys.length} cell keys`);
+    }
+
+    return transformed;
   }, [filteredData]);
 
-  // Apply zoom to chart data, then downsample the zoomed region
+  // Apply zoom to chart data (no additional downsampling needed)
   const zoomedChartData = useMemo(() => {
     if (!chartData.length) return [];
 
@@ -1621,16 +1628,10 @@ const BMSAnalyzer = () => {
 
     const zoomedSlice = chartData.slice(safeStartIdx, safeEndIdx);
 
-    // Now apply LTTB downsampling to the zoomed slice
-    const maxPts = 600;
-    const downsampledZoom = zoomedSlice.length > maxPts
-      ? lttbDownsample(zoomedSlice, maxPts)
-      : zoomedSlice;
+    console.log(`zoomedChartData: ${zoomedSlice.length} points in zoom range`);
 
-    console.log(`zoomedChartData: ${downsampledZoom.length} points (from ${zoomedSlice.length} in zoom range)`);
-
-    return downsampledZoom;
-  }, [chartData, chartZoom, lttbDownsample]);
+    return zoomedSlice;
+  }, [chartData, chartZoom]);
 
   // Detect date changes in chart data for visual markers
   const dateChangeMarkers = useMemo(() => {
