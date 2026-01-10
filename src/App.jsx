@@ -1553,16 +1553,11 @@ const BMSAnalyzer = () => {
   const chartData = useMemo(() => {
     if (!filteredData || filteredData.length === 0) return [];
 
-    const maxPts = 600; // Increased for better tooltip detection on large datasets (was 300)
+    // Don't downsample here - wait until after zoom is applied
+    // This ensures each zoom view gets full resolution
+    console.log(`chartData: Processing ${filteredData.length} raw points`);
 
-    // Use LTTB if data exceeds threshold, otherwise use all data
-    const downsampledData = filteredData.length > maxPts
-      ? lttbDownsample(filteredData, maxPts)
-      : filteredData;
-
-    console.log(`chartData: Processing ${downsampledData.length} points (from ${filteredData.length} original)`);
-
-    return downsampledData.map(d => {
+    return filteredData.map(d => {
       // Build cell voltage object - ensure keys are numeric and map to cell0, cell1, cell2, etc.
       const cellVoltages = {};
       if (d.cells) {
@@ -1613,7 +1608,7 @@ const BMSAnalyzer = () => {
     });
   }, [filteredData]);
 
-  // Apply zoom to chart data
+  // Apply zoom to chart data, then downsample the zoomed region
   const zoomedChartData = useMemo(() => {
     if (!chartData.length) return [];
 
@@ -1624,8 +1619,18 @@ const BMSAnalyzer = () => {
     const safeStartIdx = Math.max(0, Math.min(startIdx, chartData.length - 1));
     const safeEndIdx = Math.max(safeStartIdx + 1, Math.min(endIdx, chartData.length));
 
-    return chartData.slice(safeStartIdx, safeEndIdx);
-  }, [chartData, chartZoom]);
+    const zoomedSlice = chartData.slice(safeStartIdx, safeEndIdx);
+
+    // Now apply LTTB downsampling to the zoomed slice
+    const maxPts = 600;
+    const downsampledZoom = zoomedSlice.length > maxPts
+      ? lttbDownsample(zoomedSlice, maxPts)
+      : zoomedSlice;
+
+    console.log(`zoomedChartData: ${downsampledZoom.length} points (from ${zoomedSlice.length} in zoom range)`);
+
+    return downsampledZoom;
+  }, [chartData, chartZoom, lttbDownsample]);
 
   // Detect date changes in chart data for visual markers
   const dateChangeMarkers = useMemo(() => {
