@@ -2359,6 +2359,7 @@ const BMSAnalyzer = () => {
                       // Find active faults at this timestamp
                       const ts = new Date(data.fullTime).getTime();
                       const activeFaults = faultEvents.filter(f => {
+                        if (!f.startTime) return false;
                         const startTs = f.startTime.getTime();
                         const endTs = f.endTime ? f.endTime.getTime() : Date.now();
                         return ts >= startTs && ts <= endTs;
