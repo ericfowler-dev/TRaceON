@@ -2310,7 +2310,7 @@ const BMSAnalyzer = () => {
                     name="Pack Max"
                     connectNulls
                     isAnimationActive={false}
-                    activeDot={{ r: 6 }}
+                    activeDot={{ r: 20, fill: '#10b981', opacity: 0.3 }}
                   />
                   <Line
                     type="monotone"
@@ -2321,7 +2321,7 @@ const BMSAnalyzer = () => {
                     name="Pack Min"
                     connectNulls
                     isAnimationActive={false}
-                    activeDot={{ r: 6 }}
+                    activeDot={{ r: 20, fill: '#3b82f6', opacity: 0.3 }}
                   />
 
                   {/* Individual Cell Lines - Simplified rendering */}
@@ -2445,7 +2445,7 @@ const BMSAnalyzer = () => {
                     name="Δ mV (Max-Min)"
                     connectNulls
                     isAnimationActive={false}
-                    activeDot={{ r: 8 }}
+                    activeDot={{ r: 20, fill: '#10b981', opacity: 0.3 }}
                   />
                   {/* Overlay data with conditional colors - this creates the effect */}
                   {zoomedChartData.map((d, i) => {
