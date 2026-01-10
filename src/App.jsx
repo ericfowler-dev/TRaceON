@@ -1994,7 +1994,13 @@ const BMSAnalyzer = () => {
         )}
 
         {/* ==================== CHARTS ==================== */}
-        {activeTab === 'charts' && chartData.length > 0 && (
+        {activeTab === 'charts' && (
+          <>
+            {!chartData || chartData.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-slate-400 text-lg">No chart data available. Please upload a BMS log file.</div>
+              </div>
+            ) : (
           <div className="space-y-6">
             {/* Zoom Controls */}
             <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4 space-y-4">
@@ -2452,6 +2458,8 @@ const BMSAnalyzer = () => {
               </ResponsiveContainer>
             </ChartCard>
           </div>
+            )}
+          </>
         )}
 
         {/* ==================== FAULTS ==================== */}
