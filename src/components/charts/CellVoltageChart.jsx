@@ -15,15 +15,38 @@ const ChartCard = ({ title, icon, children }) => (
   </div>
 );
 
-const CellVoltageTooltip = ({ active, payload, cellCount }) => {
+const CellVoltageTooltip = ({ active, payload, cellCount, cellIndexStart = 0 }) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
 
   const cellVoltages = [];
-  for (let i = 0; i < (cellCount || 0); i++) {
-    const cellKey = `cell${i}`;
-    if (data[cellKey] != null) {
-      cellVoltages.push({ cell: i + 1, voltage: data[cellKey] });
+  if (cellCount && cellCount > 0) {
+    for (let i = 0; i < cellCount; i++) {
+      const cellIndex = cellIndexStart + i;
+      const cellKey = `cell${cellIndex}`;
+      if (data[cellKey] != null) {
+        const displayIndex = cellIndexStart === 0 ? i + 1 : cellIndex;
+        cellVoltages.push({ cell: displayIndex, voltage: data[cellKey] });
+      }
+    }
+  } else {
+    const keys = Object.keys(data).filter(k => k.startsWith('cell'));
+    let minIndex = null;
+    for (let i = 0; i < keys.length; i++) {
+      const idx = parseInt(keys[i].slice(4), 10);
+      if (!Number.isNaN(idx)) {
+        if (minIndex === null || idx < minIndex) minIndex = idx;
+      }
+    }
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const idx = parseInt(key.slice(4), 10);
+      if (Number.isNaN(idx)) continue;
+      const value = data[key];
+      if (value != null) {
+        const displayIndex = minIndex === 0 ? idx + 1 : idx;
+        cellVoltages.push({ cell: displayIndex, voltage: value });
+      }
     }
   }
 
@@ -78,7 +101,7 @@ const CellVoltageTooltip = ({ active, payload, cellCount }) => {
   );
 };
 
-const CellVoltageChart = ({ data, cellCount, dateChangeMarkers = [] }) => {
+const CellVoltageChart = ({ data, cellCount, cellIndexStart = 0, dateChangeMarkers = [] }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={`Cell Voltage Precision (${cellCount || 0} cells)`} icon={<Activity className="w-4 h-4 text-cyan-400" />}>
@@ -151,7 +174,7 @@ const CellVoltageChart = ({ data, cellCount, dateChangeMarkers = [] }) => {
             allowEscapeViewBox={{ x: true, y: true }}
             cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
             wrapperStyle={{ zIndex: 1000 }}
-            content={<CellVoltageTooltip cellCount={cellCount} />}
+            content={<CellVoltageTooltip cellCount={cellCount} cellIndexStart={cellIndexStart} />}
           />
 
           <Line
@@ -177,22 +200,26 @@ const CellVoltageChart = ({ data, cellCount, dateChangeMarkers = [] }) => {
             activeDot={{ r: 20, fill: '#3b82f6', opacity: 0.3 }}
           />
 
-          {Array.from({ length: cellCount || 0 }, (_, i) => (
+          {Array.from({ length: cellCount || 0 }, (_, i) => {
+            const cellIndex = cellIndexStart + i;
+            const displayIndex = cellIndexStart === 0 ? i + 1 : cellIndex;
+            return (
             <Line
-              key={i}
+              key={cellIndex}
               type="monotone"
-              dataKey={`cell${i}`}
+              dataKey={`cell${cellIndex}`}
               stroke={`hsl(${i * (360 / (cellCount || 1))}, 70%, 60%)`}
               dot={false}
               strokeWidth={1.2}
               opacity={0.6}
               connectNulls
               activeDot={false}
-              name={`Cell #${i+1}`}
+              name={`Cell #${displayIndex}`}
               isAnimationActive={false}
               legendType="none"
             />
-          ))}
+            );
+          })}
         </LineChart>
       </ResponsiveContainer>
     </ChartCard>

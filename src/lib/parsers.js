@@ -9,7 +9,13 @@ export const cleanKey = (k) => k ? k.replace(/^\ufeff/, '').trim() : '';
 
 // Parse BMS date format: "YYYY/MM/DD HH:MM:SS"
 export const parseDate = (str) => {
-  if (!str || typeof str !== 'string') return null;
+  if (!str) return null;
+  if (str instanceof Date) return isNaN(str.getTime()) ? null : str;
+  if (typeof str === 'number') {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof str !== 'string') return null;
   const parts = str.trim().split(/[\s/:]+/);
   if (parts.length < 6) return null;
   const d = new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]);

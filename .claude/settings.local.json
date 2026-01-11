@@ -19,7 +19,10 @@
       "Bash(npm run build:*)",
       "Bash(npm install:*)",
       "Bash(npm run deploy:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(node analyze-problem-file.js:*)",
+      "Bash(node:*)",
+      "Bash(ls -la \"c:\\\\Users\\\\efowler\\\\Projects\\\\bms-analyzer\\\\src\"\" 2>/dev/null || dir \"c:UsersefowlerProjectsbms-analyzersrc\"\")"
     ]
   }
 }
