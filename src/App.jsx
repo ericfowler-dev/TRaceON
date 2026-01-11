@@ -726,7 +726,7 @@ const BMSAnalyzer = () => {
             <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
             <div className="border-l border-slate-700 pl-4">
               <h1 className="text-lg font-semibold">{fileName}</h1>
-              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.0</p>
+              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.1</p>
             </div>
           </div>
 
