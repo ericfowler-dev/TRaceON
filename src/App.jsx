@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, useReducer } from 'react';
 import * as XLSX from 'xlsx';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, AreaChart, Area, ComposedChart, ReferenceLine
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, AreaChart, Area, ReferenceLine
 } from 'recharts';
 import {
   FileSpreadsheet, Upload, AlertCircle, AlertTriangle, Clock, Zap,
@@ -12,356 +12,26 @@ import {
   Search, Flag, Eye
 } from 'lucide-react';
 
-// =============================================================================
-// CONSTANTS & MAPPINGS
-// =============================================================================
-const ALARM_MAPPING = {
-  ChgOV: 'Charge Overvoltage', DchgOV: 'Discharge Overvoltage',
-  ChgUV: 'Charge Undervoltage', DchgUV: 'Discharge Undervoltage',
-  ChgPackOV: 'Charge Pack Overvoltage', DchgPackOV: 'Discharge Pack Overvoltage',
-  ChgPackUV: 'Charge Pack Undervoltage', DchgPackUV: 'Discharge Pack Undervoltage',
-  ChgPackVdiff: 'Charge Pack Voltage Diff', DchgPackVdiff: 'Discharge Pack Voltage Diff',
-  ChgVdiff: 'Charge Voltage Diff', DchgVdiff: 'Discharge Voltage Diff',
-  ChgOT: 'Charge Overtemperature', DchgOT: 'Discharge Overtemperature',
-  ChgUT: 'Charge Undertemperature', DchgUT: 'Discharge Undertemperature',
-  ChgTdiff: 'Charge Temp Difference', DchgTdiff: 'Discharge Temp Difference',
-  DcChgOC: 'DC Charger Overcurrent', AcChgOC: 'AC Charger Overcurrent',
-  FeedbackOC: 'Feedback Overcurrent', DchgContOC: 'Discharge Contactor OC',
-  DchgTransOC: 'Discharge Transistor OC', HighSoc: 'High SOC', LowSoc: 'Low SOC',
-  Insulation: 'Insulation Fault', PrechargeFail: 'Precharge Failure',
-  ChgHeatOT: 'Charge Heater Overtemp', DchgHeatOT: 'Discharge Heater Overtemp',
-  SocUnstable: 'SOC Unstable', LowSupplyPwr: 'Low Supply Power', HighSupplyPwr: 'High Supply Power',
-  ChgMosOT: 'Charge MOSFET Overtemp', DcgMosOT: 'Discharge MOSFET Overtemp',
-  VoltOpenWire: 'Voltage Open Wire', TempOpenWire: 'Temp Open Wire',
-  InterComm: 'Internal Comm Fault', ChargerComm: 'Charger Comm Error',
-  VcuComm: 'VCU Comm Error', BmsSysFault: 'BMS System Fault',
-  HvilFault: 'HVIL Fault', RlyFault: 'Relay Fault', HeatFault: 'Heater Fault',
-  CrashFault: 'Crash Fault', CurAbnormal: 'Current Abnormal',
-  'Thermal failure': 'Thermal Failure', 'ShortCur failure': 'Short Circuit Failure'
-};
+// Import from extracted modules
+import {
+  ALARM_MAPPING, SEVERITY_MAP, detectProduct,
+  RELAY_NAMES, getRelayConfig, ALL_RELAYS, THRESHOLDS
+} from './lib/thresholds';
+import {
+  cleanKey, parseDate, getVal, findSheet,
+  fmt, fmtTime, fmtDuration, formatInsulation,
+  iterativeMergeSort, getVoltageHeatMap
+} from './lib/parsers';
 
-const SEVERITY_MAP = { 'Lvl 1 Alarm': 1, 'Lvl 2 Alarm': 2, 'Lvl 3 Alarm': 3 };
-
-// ====================================================================
-// PRODUCT SPECIFICATIONS - Source: PSI Product Rating Guide
-// Per-cell limits are derived from pack limits divided by series cell count.
-// Parallel strings (e.g., 2P24S) change capacity but DO NOT change voltage.
-// Always use series cell count for voltage calculations, not total cell count.
-// ====================================================================
-const PRODUCT_SPECS = {
-  '80V230Ah': {
-    name: '80V 230Ah',
-    packVoltage: { min: 60, max: 85.2 },
-    cellConfig: '1P24S',
-    seriesCellCount: 24,
-    totalCells: 24,
-    // Derived per-cell limits: pack voltage / series cell count
-    cellVoltage: { min: 2500, max: 3550 }, // mV (60V/24 = 2.50V, 85.2V/24 = 3.55V)
-    capacity: 230
-  },
-  '80V304Ah': {
-    name: '80V 304Ah',
-    packVoltage: { min: 60, max: 85.2 },
-    cellConfig: '1P24S',
-    seriesCellCount: 24,
-    totalCells: 24,
-    cellVoltage: { min: 2500, max: 3550 }, // mV (60V/24 = 2.50V, 85.2V/24 = 3.55V)
-    capacity: 304
-  },
-  '80V460Ah': {
-    name: '80V 460Ah',
-    packVoltage: { min: 60, max: 85.2 },
-    cellConfig: '2P24S',
-    seriesCellCount: 24,    // Only 24 cells in series
-    totalCells: 48,          // 2 parallel strings × 24 series = 48 total
-    // IMPORTANT: Use series count (24) for voltage math, NOT total cells (48)
-    cellVoltage: { min: 2500, max: 3550 }, // mV (60V/24 = 2.50V, 85.2V/24 = 3.55V)
-    capacity: 460
-  },
-  '96V230Ah': {
-    name: '96V 230Ah',
-    packVoltage: { min: 80, max: 113.6 },
-    cellConfig: '1P32S',
-    seriesCellCount: 32,
-    totalCells: 32,
-    cellVoltage: { min: 2500, max: 3550 }, // mV (80V/32 = 2.50V, 113.6V/32 = 3.55V)
-    capacity: 230
-  }
-};
-
-// Auto-detect product based on cell count and voltage range
-function detectProduct(cellCount, avgPackVoltage) {
-  // First try exact match on total cell count
-  for (const [key, spec] of Object.entries(PRODUCT_SPECS)) {
-    if (spec.totalCells === cellCount) {
-      return { key, spec };
-    }
-  }
-
-  // Fallback: detect by series cell count (for cases where log shows series count)
-  if (cellCount === 24) {
-    // Could be any 80V variant - use voltage to disambiguate
-    return { key: '80V230Ah', spec: PRODUCT_SPECS['80V230Ah'] };
-  } else if (cellCount === 32) {
-    return { key: '96V230Ah', spec: PRODUCT_SPECS['96V230Ah'] };
-  }
-
-  // No match - return null
-  return null;
-}
-
-// Relay mapping - from relay_cross_reference.csv
-// Product-specific relay configurations
-const RELAY_CONFIG_BY_PRODUCT = {
-  // Default/Unknown configuration
-  default: {
-    'Relay0': 'Positive Relay',
-    'Relay1': 'Charging Relay',
-    'Relay2': 'Heating Relay',
-    'Relay3': 'Alarm Relay',
-    'Relay4': 'Pre-charge Relay',
-    'Relay5': 'Negative Relay'
-  },
-  // 80V systems typically use pre-charge on Relay3
-  '80V': {
-    'Relay0': 'Positive Relay',
-    'Relay1': 'Charging Relay',
-    'Relay2': 'Heating Relay',
-    'Relay3': 'Pre-charge Relay',
-    'Relay4': 'Negative Relay',
-    'Relay5': 'DC/DC Relay'
-  },
-  // 96V systems with alarm relay configuration
-  '96V_ALARM': {
-    'Relay0': 'Positive Relay',
-    'Relay1': 'Charging Relay',
-    'Relay2': 'Heating Relay',
-    'Relay3': 'Alarm Relay',
-    'Relay4': 'Pre-charge Relay',
-    'Relay5': 'Negative Relay'
-  }
-};
-
-// Legacy fallback for unknown configurations
-const RELAY_NAMES = {
-  'Relay0': 'Positive Relay',
-  'Relay1': 'Charging Relay',
-  'Relay2': 'Heating Relay',
-  'Relay3': 'Alarm Relay / Pre-charge Relay',
-  'Relay4': 'Pre-charge Relay / Negative Relay',
-  'Relay5': 'Negative Relay / DC/DC Relay'
-};
-
-// Function to determine relay configuration based on device info
-function getRelayConfig(deviceInfo, cellCount) {
-  // Determine system voltage based on cell count
-  if (cellCount >= 30) {
-    // 96V system (30-32 cells)
-    // Check if it's an alarm relay configuration (common in certain releases)
-    return RELAY_CONFIG_BY_PRODUCT['96V_ALARM'];
-  } else if (cellCount >= 24) {
-    // 80V system (24-26 cells)
-    return RELAY_CONFIG_BY_PRODUCT['80V'];
-  }
-
-  // Fallback to default
-  return RELAY_CONFIG_BY_PRODUCT.default;
-}
-
-// All possible relays (0-5)
-const ALL_RELAYS = ['Relay0', 'Relay1', 'Relay2', 'Relay3', 'Relay4', 'Relay5'];
-
-// Anomaly thresholds - Based on PSI Technical Training Documentation
-// Three-level system: GOOD (green) / MARGINAL (yellow) / BAD (red)
-const THRESHOLDS = {
-  // Cell Voltage (mV) - LiFePO4 Chemistry
-  cellVoltage: {
-    good: { min: 3200, max: 3550 },      // Normal operation
-    marginal: { min: 3000, max: 3650 },  // Early stress indicators
-    bad: { min: 2500, max: 4200 },       // Immediate threat to cell integrity
-    critical: 5000                        // Definitely an error/sensor issue
-  },
-
-  // Cell Imbalance (voltage spread in mV)
-  cellDiff: {
-    good: 30,       // <30mV - well balanced
-    marginal: 150,  // 30-150mV - investigate weak cells
-    critical: 200   // >150mV - reduce charge rate, service soon
-  },
-
-  // Pack Voltage (V) - Auto-detect 80V or 96V system
-  packVoltage80V: {
-    good: { min: 76.8, max: 85.2 },      // 24 cells × 3.2-3.55V
-    marginal: { min: 72, max: 90 },      // Check cell balance
-    bad: { min: 60, max: 100 }           // Activate power reduction
-  },
-  packVoltage96V: {
-    good: { min: 102.4, max: 113.6 },    // 32 cells × 3.2-3.55V
-    marginal: { min: 96, max: 120 },     // Check cell balance
-    bad: { min: 80, max: 130 }           // Activate power reduction
-  },
-
-  // Temperature (°C)
-  temp: {
-    good: { min: 15, max: 40 },          // Optimal operation
-    marginalLow: { min: 5, max: 15 },    // Suboptimal, monitor
-    marginalHigh: { min: 40, max: 50 },  // Suboptimal, prepare cooling
-    badLow: 5,                           // <5°C - Risk of plating
-    badHigh: 50,                         // >50°C - Thermal runaway risk
-    critical: 60                         // >60°C - Emergency
-  },
-
-  // Temperature Spread (°C)
-  tempDiff: {
-    good: 5,        // <5°C - normal variance
-    marginal: 10,   // 5-10°C - investigate heat distribution
-    critical: 15    // >10°C - cell defect or contact resistance
-  },
-
-  // Temperature Rise Rate (°C/min) - Critical for thermal runaway
-  tempRiseRate: {
-    good: 1,        // <1°C/min - normal
-    marginal: 2,    // 1-2°C/min - elevated
-    bad: 5,         // 2-5°C/min - significant thermal event
-    critical: 5     // >5°C/min - thermal runaway imminent
-  },
-
-  // Insulation Resistance (kΩ) - Industry Standards for 80V-105V Systems
-  // Rule of thumb: ~1 MΩ per 1000V operating voltage
-  // IEC 61557-8 / FMVSS 305: Critical fault at 100 Ω/V (8kΩ for 80V)
-  // Warning threshold typically 500 Ω/V (40kΩ for 80V)
-  //
-  // NOTE: Insulation varies with operating conditions:
-  // - Decreases as voltage rises (charging to 100% SOC)
-  // - Decreases with temperature
-  // - Higher at low SOC, lower at high SOC
-  // - Affected by humidity, coolant leaks, vibration, aging
-  insulation: {
-    excellent: 2000,     // >2 MΩ - Fully healthy pack
-    good: 500,           // 500kΩ - 2MΩ - Normal operation
-    warning: 100,        // 100-500kΩ - Minor degradation, monitor closely
-    fault: 100,          // <100kΩ - Dangerous, immediate action required
-    critical: 40,        // <40kΩ - Below automotive warning threshold (500 Ω/V × 80V)
-    open: 65534          // Open circuit indicator
-  },
-
-  // Individual insulation paths (Positive/Negative to ground)
-  insulationPath: {
-    excellent: 500,      // >500kΩ each path
-    good: 250,           // 250-500kΩ - Normal
-    warning: 50,         // 50-250kΩ - Minor degradation
-    fault: 50            // <50kΩ - Dangerous
-  },
-
-  // State of Charge (%)
-  soc: {
-    good: { min: 10, max: 100 },         // Normal operating range
-    marginalHigh: { min: 100, max: 105 }, // Coulomb counting drift
-    badLow: 5,                            // <5% - Over-discharge risk
-    badHigh: 105                          // >105% - Firmware error
-  },
-
-  // State of Health (%)
-  soh: {
-    good: 90,         // >90% - normal operation
-    marginal: 80,     // 80-90% - begin replacement planning
-    badLevel1: 70,    // 70-80% - schedule replacement soon
-    badLevel2: 60,    // 60-70% - critical replacement window
-    eol: 60           // <60% - end of life
-  }
-};
+// Import extracted chart components
+import PackSocChart from './components/charts/PackSocChart';
+import CellVoltageChart from './components/charts/CellVoltageChart';
+import CellImbalanceChart from './components/charts/CellImbalanceChart';
 
 // =============================================================================
-// UTILITY FUNCTIONS
+// DEBUG FLAG - Set to true to enable console logging
 // =============================================================================
-const cleanKey = (k) => k ? k.replace(/^\ufeff/, '').trim() : '';
-
-const parseDate = (str) => {
-  if (!str || typeof str !== 'string') return null;
-  const parts = str.trim().split(/[\s/:]+/);
-  if (parts.length < 6) return null;
-  const d = new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]);
-  return isNaN(d.getTime()) ? null : d;
-};
-
-const getVal = (row, ...keys) => {
-  for (const key of keys) {
-    for (const k of Object.keys(row)) {
-      const clean = cleanKey(k);
-      if (clean === key || clean.toLowerCase().includes(key.toLowerCase())) {
-        const v = row[k];
-        if (v !== null && v !== undefined && v !== '' && v !== 'Invalid') return v;
-      }
-    }
-  }
-  return undefined;
-};
-
-const findSheet = (sheets, ...terms) => {
-  for (const term of terms) {
-    const name = Object.keys(sheets).find(n => n.toLowerCase().includes(term.toLowerCase()));
-    if (name) return sheets[name];
-  }
-  return [];
-};
-
-const fmt = (v, dec = 1) => (v == null || isNaN(v)) ? '—' : Number(v).toFixed(dec);
-const fmtTime = (d) => d ? d.toLocaleString() : '—';
-const fmtDuration = (min) => {
-  if (min == null) return '—';
-  if (min < 1) return `${Math.round(min * 60)}s`;
-  if (min < 60) return `${Math.round(min)}m`;
-  return `${Math.floor(min / 60)}h ${Math.round(min % 60)}m`;
-};
-
-const formatInsulation = (val) => {
-  if (val == null) return '—';
-  if (val >= THRESHOLDS.insulation.open) return '> 65MΩ (Open)';
-  if (val >= 1000) return `${(val / 1000).toFixed(2)} MΩ`;
-  return `${val.toFixed(2)} kΩ`;
-};
-
-// Heat map for cell voltages (mV) - Three-level boundary system
-// Uses absolute thresholds from PSI spec rather than relative positioning
-const getVoltageHeatMap = (voltage, minV, maxV, avgV) => {
-  if (voltage == null) return { bg: 'bg-slate-700/80', text: 'text-slate-400', label: 'NO DATA' };
-
-  // Error detection - sensor issues
-  if (voltage > THRESHOLDS.cellVoltage.critical || voltage < 1000) {
-    return { bg: 'bg-red-600/90', text: 'text-white', label: 'ERROR' };
-  }
-
-  // BAD level - Immediate threat to cell integrity (RED)
-  if (voltage < THRESHOLDS.cellVoltage.marginal.min || voltage > THRESHOLDS.cellVoltage.marginal.max) {
-    if (voltage < THRESHOLDS.cellVoltage.good.min) {
-      return { bg: 'bg-red-500/80', text: 'text-white', label: 'LOW' };
-    } else {
-      return { bg: 'bg-red-500/80', text: 'text-white', label: 'HIGH' };
-    }
-  }
-
-  // MARGINAL level - Early stress indicators (YELLOW/AMBER)
-  if (voltage < THRESHOLDS.cellVoltage.good.min || voltage > THRESHOLDS.cellVoltage.good.max) {
-    if (voltage < THRESHOLDS.cellVoltage.good.min) {
-      return { bg: 'bg-amber-500/80', text: 'text-slate-900', label: 'BELOW' };
-    } else {
-      return { bg: 'bg-amber-500/80', text: 'text-slate-900', label: 'ABOVE' };
-    }
-  }
-
-  // GOOD level - Normal operation (GREEN)
-  // Within 3200-3550mV range - use gradient within this range
-  const goodRange = THRESHOLDS.cellVoltage.good.max - THRESHOLDS.cellVoltage.good.min;
-  const position = (voltage - THRESHOLDS.cellVoltage.good.min) / goodRange;
-
-  if (position < 0.3) {
-    return { bg: 'bg-green-500/70', text: 'text-white', label: 'GOOD' };
-  } else if (position < 0.7) {
-    return { bg: 'bg-green-500/90', text: 'text-white', label: 'OPTIMAL' };
-  } else {
-    return { bg: 'bg-green-600/80', text: 'text-white', label: 'GOOD' };
-  }
-};
+const DEBUG = false;
 
 // =============================================================================
 // HELPER COMPONENTS
@@ -408,26 +78,76 @@ const Row = ({ label, value, highlight }) => (
 );
 
 // =============================================================================
+// STATE MANAGEMENT - useReducer for analysis state
+// =============================================================================
+const analysisInitialState = {
+  timeSeries: [],
+  faultEvents: [],
+  anomalies: [],
+  deviceInfo: {},
+  selectedDate: 'all',
+  playbackIdx: 0,
+  isPlaying: false,
+  playbackSpeed: 1,
+  chartZoom: { start: 0, end: 100 }
+};
+
+function analysisReducer(state, action) {
+  switch (action.type) {
+    case 'FILE_LOADED':
+      return {
+        ...state,
+        timeSeries: action.payload.timeSeries,
+        faultEvents: action.payload.faultEvents,
+        anomalies: action.payload.anomalies,
+        deviceInfo: action.payload.deviceInfo,
+        selectedDate: 'all',
+        playbackIdx: 0,
+        isPlaying: false,
+        chartZoom: { start: 0, end: 100 }
+      };
+    case 'SET_DATE':
+      return {
+        ...state,
+        selectedDate: action.payload,
+        playbackIdx: 0,
+        isPlaying: false,
+        chartZoom: { start: 0, end: 100 }
+      };
+    case 'SET_PLAYBACK_IDX':
+      return { ...state, playbackIdx: action.payload };
+    case 'SET_PLAYING':
+      return { ...state, isPlaying: action.payload };
+    case 'TOGGLE_PLAYING':
+      return { ...state, isPlaying: !state.isPlaying };
+    case 'SET_PLAYBACK_SPEED':
+      return { ...state, playbackSpeed: action.payload };
+    case 'SET_ZOOM':
+      return { ...state, chartZoom: action.payload };
+    case 'RESET':
+      return analysisInitialState;
+    default:
+      return state;
+  }
+}
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 const BMSAnalyzer = () => {
+  // Analysis state managed by reducer (prevents cross-field bugs)
+  const [state, dispatch] = useReducer(analysisReducer, analysisInitialState);
+  const { timeSeries, faultEvents, anomalies, deviceInfo, selectedDate, playbackIdx, isPlaying, playbackSpeed, chartZoom } = state;
+
+  // UI state (remains as individual useState for simplicity)
   const [rawSheets, setRawSheets] = useState({});
-  const [timeSeries, setTimeSeries] = useState([]);
-  const [faultEvents, setFaultEvents] = useState([]);
-  const [anomalies, setAnomalies] = useState([]);
-  const [deviceInfo, setDeviceInfo] = useState({});
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedDate, setSelectedDate] = useState('all');
-  const [playbackIdx, setPlaybackIdx] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1); // 0.25x, 0.5x, 1x, 2x, 4x
   const [expandedSheets, setExpandedSheets] = useState({});
   const [showAllRows, setShowAllRows] = useState({});
   const [searchTime, setSearchTime] = useState('');
-  const [chartZoom, setChartZoom] = useState({ start: 0, end: 100 }); // Percentage of data to show
 
   // ---------------------------------------------------------------------------
   // FILE PROCESSING
@@ -457,23 +177,51 @@ const BMSAnalyzer = () => {
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
-        const wb = XLSX.read(evt.target.result, { type: 'binary' });
-        const sheets = {};
-        wb.SheetNames.forEach(name => {
-          sheets[name] = XLSX.utils.sheet_to_json(wb.Sheets[name], { defval: null });
+        // Use array buffer for better performance with large files
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, {
+          type: 'array',
+          cellDates: true,
+          cellNF: false,
+          cellText: false,
+          sheetStubs: false // Skip empty cells to reduce memory
         });
+
+        const sheets = {};
+
+        // Process each sheet - no chunking needed since we fixed the forEach loops
+        // The stack overflow was in data processing, not XLSX parsing
+        for (let i = 0; i < wb.SheetNames.length; i++) {
+          const name = wb.SheetNames[i];
+          const sheet = wb.Sheets[name];
+          sheets[name] = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: false });
+        }
+
         setRawSheets(sheets);
-        processData(sheets);
+
+        // Use setTimeout to break up the call stack
+        setTimeout(() => {
+          try {
+            processData(sheets);
+          } catch (err) {
+            console.error('Processing error:', err);
+            setError('Failed to process data: ' + err.message);
+            setIsLoading(false);
+          }
+        }, 100);
       } catch (err) {
+        console.error('Parse error:', err);
         setError('Failed to parse file: ' + err.message);
         setIsLoading(false);
       }
     };
-    reader.readAsBinaryString(file);
+
+    // Use ArrayBuffer instead of BinaryString for better memory handling
+    reader.readAsArrayBuffer(file);
   };
 
   const processData = (sheets) => {
-    console.log('Processing sheets:', Object.keys(sheets));
+    if (DEBUG) console.log('Processing sheets:', Object.keys(sheets));
 
     const voltages = findSheet(sheets, 'voltage', '0x9a');
     const temps = findSheet(sheets, 'temperature', '0x09');
@@ -489,10 +237,11 @@ const BMSAnalyzer = () => {
     const dataMap = new Map();
     const detectedAnomalies = [];
 
-    // Process VOLTAGES
-    voltages.forEach((row, rowIdx) => {
+    // Process VOLTAGES - Use for loop instead of forEach to avoid stack overflow
+    for (let rowIdx = 0; rowIdx < voltages.length; rowIdx++) {
+      const row = voltages[rowIdx];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
       const dateKey = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 
@@ -514,11 +263,22 @@ const BMSAnalyzer = () => {
       // Extract ALL cell voltages and check for anomalies
       let hasAnomaly = false;
       const anomalyCells = [];
+      let firstCellLogged = false;
 
-      Object.keys(row).forEach(k => {
+      const rowKeys = Object.keys(row);
+      for (let i = 0; i < rowKeys.length; i++) {
+        const k = rowKeys[i];
         const m = cleanKey(k).match(/Cell volt\.N\+(\d+)/i);
         if (m) {
           const cellIdx = parseInt(m[1]);
+          // DEBUG: Log first cell voltage column to determine if 0-based or 1-based
+          if (DEBUG && rowIdx === 0 && !firstCellLogged) {
+            console.log('=== CELL INDEXING DEBUG ===');
+            console.log('First cell voltage column name:', k);
+            console.log('Extracted cell index:', cellIdx);
+            console.log('Clean key:', cleanKey(k));
+            firstCellLogged = true;
+          }
           const v = parseFloat(row[k]);
           if (!isNaN(v)) {
             e.cells[cellIdx] = v;
@@ -531,7 +291,15 @@ const BMSAnalyzer = () => {
             }
           }
         }
-      });
+      }
+
+      // DEBUG: After processing all cells in first row, log all cell keys
+      if (DEBUG && rowIdx === 0 && Object.keys(e.cells).length > 0) {
+        const cellKeys = Object.keys(e).filter(k => k.startsWith('cell'));
+        console.log('All cell keys after processing first row:', cellKeys);
+        console.log('Cell count:', cellKeys.length);
+        console.log('Sample cell values:', cellKeys.slice(0, 5).map(k => `${k}=${e[k]}`).join(', '));
+      }
 
       // Check for cell imbalance (voltage spread) using new three-level system
       if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDiff.critical) {
@@ -577,12 +345,13 @@ const BMSAnalyzer = () => {
           severity: anomalyCells.some(c => c.voltage > 10000) ? 3 : 2
         });
       }
-    });
+    }
 
-    // Process TEMPERATURES
-    temps.forEach(row => {
+    // Process TEMPERATURES - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < temps.length; i++) {
+      const row = temps[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
       const dateKey = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 
@@ -591,7 +360,9 @@ const BMSAnalyzer = () => {
       }
       const e = dataMap.get(ts);
 
-      Object.keys(row).forEach(k => {
+      const tempKeys = Object.keys(row);
+      for (let j = 0; j < tempKeys.length; j++) {
+        const k = tempKeys[j];
         const cleaned = cleanKey(k);
         // Match CellTemp1(℃) or CellTemp1 format
         const m = cleaned.match(/CellTemp(\d+)/i);
@@ -599,13 +370,14 @@ const BMSAnalyzer = () => {
           const v = parseFloat(row[k]);
           if (!isNaN(v) && v > -50 && v < 150) e[`temp${m[1]}`] = v;
         }
-      });
-    });
+      }
+    }
 
-    // Process PEAKS
-    peaks.forEach(row => {
+    // Process PEAKS - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < peaks.length; i++) {
+      const row = peaks[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
       const dateKey = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 
@@ -627,12 +399,13 @@ const BMSAnalyzer = () => {
       if (e.maxTemp != null && e.minTemp != null && e.maxTemp > -40 && e.minTemp > -40) {
         e.tempDiff = e.maxTemp - e.minTemp;
       }
-    });
+    }
 
-    // Process SYSTEM STATE
-    system.forEach(row => {
+    // Process SYSTEM STATE - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < system.length; i++) {
+      const row = system[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
       const dateKey = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
 
@@ -678,12 +451,14 @@ const BMSAnalyzer = () => {
       e.dchgDiagFault = getVal(row, 'Dchg Diag. Fault Flag');
 
       // Parse relay states - ensure all 6 relays are initialized
-      ALL_RELAYS.forEach(relayId => {
-        e.relays[relayId] = 'OFF'; // Default to OFF
-      });
+      for (let j = 0; j < ALL_RELAYS.length; j++) {
+        e.relays[ALL_RELAYS[j]] = 'OFF'; // Default to OFF
+      }
 
       // Parse relay states - Excel has "Relay 0" with space, not "Relay0"
-      Object.keys(row).forEach(k => {
+      const sysKeys = Object.keys(row);
+      for (let j = 0; j < sysKeys.length; j++) {
+        const k = sysKeys[j];
         const cleaned = cleanKey(k);
         const m = cleaned.match(/^Relay\s*(\d+)$/i);
         if (m) {
@@ -699,13 +474,14 @@ const BMSAnalyzer = () => {
             e.relays[relayId] = 'OFF';
           }
         }
-      });
-    });
+      }
+    }
 
-    // Process CELL BALANCING
-    balancing.forEach(row => {
+    // Process CELL BALANCING - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < balancing.length; i++) {
+      const row = balancing[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
 
       if (!dataMap.has(ts)) {
@@ -715,20 +491,23 @@ const BMSAnalyzer = () => {
       e.balancing = e.balancing || {};
 
       // Parse balancing states for each cell
-      Object.keys(row).forEach(k => {
+      const balKeys = Object.keys(row);
+      for (let j = 0; j < balKeys.length; j++) {
+        const k = balKeys[j];
         const m = cleanKey(k).match(/Balancing\s+state\s+(\d+)/i);
         if (m) {
           const cellNum = parseInt(m[1]);
           const val = row[k];
           e.balancing[cellNum] = val === 'Balance' ? 'ACTIVE' : 'OFF';
         }
-      });
-    });
+      }
+    }
 
-    // Process ENERGY DATA
-    energy.forEach(row => {
+    // Process ENERGY DATA - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < energy.length; i++) {
+      const row = energy[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
 
       if (!dataMap.has(ts)) {
@@ -740,12 +519,13 @@ const BMSAnalyzer = () => {
       e.accChargedEnergy = parseFloat(getVal(row, 'Acc. charged energy')) || undefined;
       e.dischargedEnergy = parseFloat(getVal(row, 'This time discharged energy')) || undefined;
       e.accDischargedEnergy = parseFloat(getVal(row, 'Acc. discharged energy')) || undefined;
-    });
+    }
 
-    // Process CHARGING DATA
-    charging.forEach(row => {
+    // Process CHARGING DATA - Use for loop instead of forEach to avoid stack overflow
+    for (let i = 0; i < charging.length; i++) {
+      const row = charging[i];
       const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+      if (!t) continue;
       const ts = t.getTime();
 
       if (!dataMap.has(ts)) {
@@ -763,7 +543,7 @@ const BMSAnalyzer = () => {
       e.chargerPortTemp1 = parseFloat(getVal(row, 'Charger port temp.01')) || undefined;
       e.chargerPortTemp2 = parseFloat(getVal(row, 'Charger port temp.02')) || undefined;
       e.chargerPortTemp3 = parseFloat(getVal(row, 'Charger port temp.03')) || undefined;
-    });
+    }
 
     // ====================================================================
     // ENHANCED Z-SCORE OUTLIER DETECTION FOR CELL VOLTAGES
@@ -804,7 +584,9 @@ const BMSAnalyzer = () => {
     let productSpec = null;
     let configMismatch = false;
 
-    const firstEntry = Array.from(dataMap.values())[0];
+    // Compute entries array once and reuse throughout (avoids repeated Array.from calls)
+    const entriesArray = Array.from(dataMap.values());
+    const firstEntry = entriesArray[0];
     if (firstEntry) {
       const cellCount = Object.keys(firstEntry.cells).length;
       const avgPackVoltage = firstEntry.packVoltage || 0;
@@ -864,9 +646,11 @@ const BMSAnalyzer = () => {
       const HYSTERESIS_MV = 50; // Industry-standard deadband for charger overshoot tolerance
 
       // Only apply product-specific validation if we have valid product detection
-      dataMap.forEach((e) => {
-        Object.entries(e.cells).forEach(([cellIdx, voltage]) => {
-          if (voltage == null || voltage < 1000 || voltage > 5000) return;
+      for (const [ts, e] of dataMap) {
+        const cellEntries = Object.entries(e.cells);
+        for (let i = 0; i < cellEntries.length; i++) {
+          const [cellIdx, voltage] = cellEntries[i];
+          if (voltage == null || voltage < 1000 || voltage > 5000) continue;
 
           // CRITICAL UNDERVOLTAGE: Below minimum with hysteresis (e.g., <2450mV for 2500mV spec)
           if (voltage < (productSpec.cellVoltage.min - HYSTERESIS_MV)) {
@@ -891,11 +675,11 @@ const BMSAnalyzer = () => {
               severity: 3
             });
           }
-        });
-      });
+        }
+      }
     }
 
-    dataMap.forEach((e) => {
+    for (const [ts, e] of dataMap) {
       const cellVoltages = Object.values(e.cells).filter(v => v != null && v > 1000 && v < 5000);
 
       if (cellVoltages.length >= 3) {  // Need at least 3 cells for meaningful statistics
@@ -916,8 +700,10 @@ const BMSAnalyzer = () => {
         // - 300+mV: Dangerous imbalance (fault alarm)
         //
         // Uses hybrid approach: Alert only if BOTH statistical (Z-score) AND physical (absolute voltage) thresholds are met
-        Object.entries(e.cells).forEach(([cellIdx, voltage]) => {
-          if (voltage == null || voltage < 1000 || voltage > 5000) return;
+        const cellEntries2 = Object.entries(e.cells);
+        for (let i = 0; i < cellEntries2.length; i++) {
+          const [cellIdx, voltage] = cellEntries2[i];
+          if (voltage == null || voltage < 1000 || voltage > 5000) continue;
 
           const zScore = Math.abs((voltage - mean) / stdDev);
           const deviation = voltage - mean;
@@ -971,12 +757,12 @@ const BMSAnalyzer = () => {
             });
           }
           // Below 80mV: Normal operation - no alerts (filters out 4mV false positives)
-        });
+        }
       }
-    });
+    }
 
     // Additional anomaly detection pass - pack voltage, temperature, insulation, SOC, SOH
-    dataMap.forEach((e) => {
+    for (const [ts, e] of dataMap) {
       // Pack voltage monitoring using product specs
       if (productSpec && !configMismatch && e.packVoltage != null) {
         // BAD: Outside published pack operating range
@@ -1215,26 +1001,44 @@ const BMSAnalyzer = () => {
           });
         }
       }
-    });
+    }
 
-    const sorted = Array.from(dataMap.values()).sort((a, b) => a.ts - b.ts);
-    console.log('Time series:', sorted.length, 'entries');
-    console.log('Anomalies detected:', detectedAnomalies.length);
+    const sorted = iterativeMergeSort(entriesArray, (a, b) => a.ts - b.ts);
+    if (DEBUG) console.log('Time series:', sorted.length, 'entries');
+    if (DEBUG) console.log('Anomalies detected:', detectedAnomalies.length);
 
-    // Process FAULTS
+    // Process FAULTS - Use for loop instead of forEach to avoid stack overflow
     const faults = [];
     const activeFaultState = new Map();
 
-    alarms.forEach((row, rowIdx) => {
-      const t = parseDate(getVal(row, 'Time'));
-      if (!t) return;
+    // Build timestamp index for O(1) lookups (avoids O(n²) sorted.find() in loop)
+    const tsIndex = new Map(sorted.map(s => [s.ts, s]));
 
-      Object.keys(row).forEach(rawKey => {
+    // Helper function to find nearest snapshot within tolerance
+    const findNearestSnapshot = (targetTs, tolerance = 2000) => {
+      // Try exact match first
+      if (tsIndex.has(targetTs)) return tsIndex.get(targetTs);
+      // Fall back to linear search within tolerance (rare case)
+      for (let offset = 1; offset <= tolerance; offset++) {
+        if (tsIndex.has(targetTs + offset)) return tsIndex.get(targetTs + offset);
+        if (tsIndex.has(targetTs - offset)) return tsIndex.get(targetTs - offset);
+      }
+      return {};
+    };
+
+    for (let rowIdx = 0; rowIdx < alarms.length; rowIdx++) {
+      const row = alarms[rowIdx];
+      const t = parseDate(getVal(row, 'Time'));
+      if (!t) continue;
+
+      const alarmKeys = Object.keys(row);
+      for (let i = 0; i < alarmKeys.length; i++) {
+        const rawKey = alarmKeys[i];
         const key = cleanKey(rawKey);
-        if (key === 'Time' || key === 'Alarm number') return;
+        if (key === 'Time' || key === 'Alarm number') continue;
 
         const val = row[rawKey];
-        if (typeof val !== 'string') return;
+        if (typeof val !== 'string') continue;
 
         const trimVal = val.trim();
         const severity = SEVERITY_MAP[trimVal];
@@ -1243,7 +1047,7 @@ const BMSAnalyzer = () => {
 
         if (currentState !== (prevState?.severity || 0)) {
           if (currentState > 0) {
-            const snapshot = sorted.find(s => Math.abs(s.ts - t.getTime()) < 2000) || {};
+            const snapshot = findNearestSnapshot(t.getTime());
 
             const evt = {
               id: `${key}-${t.getTime()}`,
@@ -1305,36 +1109,40 @@ const BMSAnalyzer = () => {
             activeFaultState.set(key, { severity: 0 });
           }
         }
-      });
-    });
+      }
+    }
 
     // Mark ongoing faults
     const lastTime = sorted[sorted.length - 1]?.time;
-    activeFaultState.forEach((state) => {
+    for (const [key, state] of activeFaultState) {
       if (state.severity > 0 && state.event && !state.event.endTime && lastTime) {
         state.event.endTime = lastTime;
         state.event.duration = (lastTime.getTime() - state.startTime.getTime()) / 60000;
         state.event.ongoing = true;
       }
-    });
+    }
 
     // Device info - comprehensive logging and extraction
     const dev = devInfo[0] || {};
     const devL = devList[0] || {};
 
-    console.log('=== DEVICE INFO DEBUG ===');
-    console.log('Device Info sheet rows:', devInfo.length);
-    console.log('Device List sheet rows:', devList.length);
-    console.log('Device Info first row keys:', Object.keys(dev));
-    console.log('Device List first row keys:', Object.keys(devL));
-    console.log('Device Info first row:', dev);
-    console.log('Device List first row:', devL);
+    if (DEBUG) {
+      console.log('=== DEVICE INFO DEBUG ===');
+      console.log('Device Info sheet rows:', devInfo.length);
+      console.log('Device List sheet rows:', devList.length);
+      console.log('Device Info first row keys:', Object.keys(dev));
+      console.log('Device List first row keys:', Object.keys(devL));
+      console.log('Device Info first row:', dev);
+      console.log('Device List first row:', devL);
+    }
 
     // Check if device info is actually empty (only has Time field or Time is empty)
     const devKeys = Object.keys(dev).filter(k => k.toLowerCase() !== 'time' && k !== '﻿Time');
     const devLKeys = Object.keys(devL).filter(k => k.toLowerCase() !== 'time' && k !== '﻿Time');
-    console.log('Device Info has', devKeys.length, 'non-time fields');
-    console.log('Device List has', devLKeys.length, 'non-time fields');
+    if (DEBUG) {
+      console.log('Device Info has', devKeys.length, 'non-time fields');
+      console.log('Device List has', devLKeys.length, 'non-time fields');
+    }
 
     // Try all possible variations with extensive fallbacks
     const release = getVal(dev, 'releaseName', 'Release', 'release name', 'Release Name', 'Release name') ||
@@ -1349,7 +1157,7 @@ const BMSAnalyzer = () => {
                  Object.values(devL).find(v => v && typeof v === 'string' && /^[0-9A-F]{8,}$/i.test(v)) ||
                  Object.values(dev).find(v => v && typeof v === 'string' && /^[0-9A-F]{8,}$/i.test(v));
 
-    console.log('Extracted values:', { release, fwid, hwid });
+    if (DEBUG) console.log('Extracted values:', { release, fwid, hwid });
 
     const deviceInfoObj = {
       release: release || '—',
@@ -1358,13 +1166,18 @@ const BMSAnalyzer = () => {
       hwid: hwid || '—',
       fwVer: getVal(devL, 'Hardware Device 1 FWVerion', 'FW Version', 'FWVerion', 'Firmware Version') || '—'
     };
-    console.log('Setting deviceInfo:', deviceInfoObj);
-    setDeviceInfo(deviceInfoObj);
+    if (DEBUG) console.log('Setting deviceInfo:', deviceInfoObj);
 
-    setTimeSeries(sorted);
-    setFaultEvents(faults.sort((a, b) => b.time - a.time));
-    setAnomalies(detectedAnomalies);
-    setPlaybackIdx(0);
+    // Dispatch all analysis state at once (avoids cross-field bugs)
+    dispatch({
+      type: 'FILE_LOADED',
+      payload: {
+        timeSeries: sorted,
+        faultEvents: iterativeMergeSort(faults, (a, b) => b.time - a.time),
+        anomalies: detectedAnomalies,
+        deviceInfo: deviceInfoObj
+      }
+    });
     setIsLoading(false);
   };
 
@@ -1373,7 +1186,7 @@ const BMSAnalyzer = () => {
   // ---------------------------------------------------------------------------
   const availableDates = useMemo(() => {
     const dates = [...new Set(timeSeries.map(d => d.dateKey))].filter(Boolean);
-    return dates.sort();
+    return iterativeMergeSort(dates, (a, b) => a.localeCompare(b));
   }, [timeSeries]);
 
   const filteredData = useMemo(() => {
@@ -1429,13 +1242,16 @@ const BMSAnalyzer = () => {
 
     // Balancing stats - count how many unique cells have been balanced
     const balancingCells = new Set();
-    filteredData.forEach(d => {
+    for (let i = 0; i < filteredData.length; i++) {
+      const d = filteredData[i];
       if (d.balancing) {
-        Object.entries(d.balancing).forEach(([cell, state]) => {
+        const balancingEntries = Object.entries(d.balancing);
+        for (let j = 0; j < balancingEntries.length; j++) {
+          const [cell, state] = balancingEntries[j];
           if (state === 'ACTIVE') balancingCells.add(cell);
-        });
+        }
       }
-    });
+    }
 
     return {
       timeRange: { start: first.time, end: last.time },
@@ -1560,14 +1376,23 @@ const BMSAnalyzer = () => {
       ? lttbDownsample(filteredData, maxPts)
       : filteredData;
 
-    console.log(`chartData: Downsampled to ${downsampledData.length} points (from ${filteredData.length} raw)`);
+    if (DEBUG) console.log(`chartData: Downsampled to ${downsampledData.length} points (from ${filteredData.length} raw)`);
+
+    // DEBUG: Check first entry's cell data
+    if (DEBUG && downsampledData.length > 0) {
+      const firstEntry = downsampledData[0];
+      console.log('chartData: First entry cells object:', firstEntry.cells);
+      console.log('chartData: First entry has', Object.keys(firstEntry.cells || {}).length, 'cells');
+    }
 
     // Transform the downsampled data
     const transformed = downsampledData.map(d => {
       // Build cell voltage object - ensure keys are numeric and map to cell0, cell1, cell2, etc.
       const cellVoltages = {};
       if (d.cells) {
-        Object.entries(d.cells).forEach(([k, v]) => {
+        const cellEntries = Object.entries(d.cells);
+        for (let i = 0; i < cellEntries.length; i++) {
+          const [k, v] = cellEntries[i];
           // Parse cell index (handle both "0" and "1" based indexing)
           const cellIdx = parseInt(k, 10);
           if (!isNaN(cellIdx) && v != null) {
@@ -1577,16 +1402,18 @@ const BMSAnalyzer = () => {
               cellVoltages[`cell${cellIdx}`] = v;
             }
           }
-        });
+        }
       }
 
       // Build temperature object
       const temps = {};
-      Object.entries(d).forEach(([k, v]) => {
+      const entries = Object.entries(d);
+      for (let i = 0; i < entries.length; i++) {
+        const [k, v] = entries[i];
         if (/^temp\d+$/.test(k) && v != null) {
           temps[k] = v;
         }
-      });
+      }
 
       return {
         time: d.timeStr,
@@ -1607,9 +1434,11 @@ const BMSAnalyzer = () => {
     });
 
     // Now return the full transformed dataset - we'll downsample in zoomedChartData
-    if (transformed.length > 0) {
+    if (DEBUG && transformed.length > 0) {
       const cellKeys = Object.keys(transformed[0]).filter(k => k.startsWith('cell'));
       console.log(`chartData: Transformed ${transformed.length} entries with ${cellKeys.length} cell keys`);
+      console.log('chartData: First entry has cell keys:', cellKeys);
+      console.log('chartData: First entry sample values:', cellKeys.slice(0, 5).map(k => `${k}=${transformed[0][k]}`).join(', '));
     }
 
     return transformed;
@@ -1628,7 +1457,7 @@ const BMSAnalyzer = () => {
 
     const zoomedSlice = chartData.slice(safeStartIdx, safeEndIdx);
 
-    console.log(`zoomedChartData: ${zoomedSlice.length} points in zoom range`);
+    if (DEBUG) console.log(`zoomedChartData: ${zoomedSlice.length} points in zoom range`);
 
     return zoomedSlice;
   }, [chartData, chartZoom]);
@@ -1638,7 +1467,8 @@ const BMSAnalyzer = () => {
     const markers = [];
     let prevDate = null;
 
-    chartData.forEach((d, i) => {
+    for (let i = 0; i < chartData.length; i++) {
+      const d = chartData[i];
       if (d.dateKey && d.dateKey !== prevDate && prevDate !== null) {
         // Format date nicely (e.g., "Jan 15")
         const dateObj = new Date(d.dateKey);
@@ -1650,35 +1480,41 @@ const BMSAnalyzer = () => {
         });
       }
       prevDate = d.dateKey;
-    });
+    }
 
     return markers;
   }, [chartData]);
 
   const currentSnap = filteredData[playbackIdx] || null;
 
+  // Guard playbackIdx bounds when filteredData changes (e.g., date filter)
+  useEffect(() => {
+    if (filteredData.length > 0 && playbackIdx >= filteredData.length) {
+      dispatch({ type: 'SET_PLAYBACK_IDX', payload: filteredData.length - 1 });
+    }
+  }, [filteredData.length, playbackIdx]);
+
   // Playback timer with variable speed
   useEffect(() => {
     if (!isPlaying || !filteredData.length) return;
     // Base interval is 100ms, adjusted by playback speed
     const interval = setInterval(() => {
-      setPlaybackIdx(prev => {
-        if (prev >= filteredData.length - 1) {
-          setIsPlaying(false);
-          return prev;
-        }
-        return prev + 1;
-      });
+      const currentIdx = playbackIdx;
+      if (currentIdx >= filteredData.length - 1) {
+        dispatch({ type: 'SET_PLAYING', payload: false });
+      } else {
+        dispatch({ type: 'SET_PLAYBACK_IDX', payload: currentIdx + 1 });
+      }
     }, 100 / playbackSpeed); // Faster speeds = shorter interval
     return () => clearInterval(interval);
-  }, [isPlaying, filteredData.length, playbackSpeed]);
+  }, [isPlaying, filteredData.length, playbackSpeed, playbackIdx]);
 
   // Jump to time
   const jumpToTime = (timeStr) => {
     if (!timeStr || !timeStr.trim()) return;
     const idx = filteredData.findIndex(d => d.fullTime?.includes(timeStr) || d.timeStr?.includes(timeStr));
     if (idx >= 0) {
-      setPlaybackIdx(idx);
+      dispatch({ type: 'SET_PLAYBACK_IDX', payload: idx });
       setActiveTab('snapshot');
     }
   };
@@ -1687,20 +1523,16 @@ const BMSAnalyzer = () => {
   const jumpToAnomaly = (anomaly) => {
     const idx = filteredData.findIndex(d => Math.abs(d.ts - anomaly.time.getTime()) < 2000);
     if (idx >= 0) {
-      setPlaybackIdx(idx);
+      dispatch({ type: 'SET_PLAYBACK_IDX', payload: idx });
       setActiveTab('snapshot');
     }
   };
 
   const reset = () => {
-    setTimeSeries([]);
-    setFaultEvents([]);
-    setAnomalies([]);
+    dispatch({ type: 'RESET' });
     setRawSheets({});
-    setDeviceInfo({});
     setFileName('');
-    setSelectedDate('all');
-    setPlaybackIdx(0);
+    setActiveTab('overview');
   };
 
   // ---------------------------------------------------------------------------
@@ -1761,7 +1593,7 @@ const BMSAnalyzer = () => {
             <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
             <div className="border-l border-slate-700 pl-4">
               <h1 className="text-lg font-semibold">{fileName}</h1>
-              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)}</p>
+              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.0</p>
             </div>
           </div>
 
@@ -1773,7 +1605,7 @@ const BMSAnalyzer = () => {
                 <select
                   className="bg-transparent border-none text-sm font-medium cursor-pointer focus:outline-none"
                   value={selectedDate}
-                  onChange={(e) => { setSelectedDate(e.target.value); setPlaybackIdx(0); }}
+                  onChange={(e) => dispatch({ type: 'SET_DATE', payload: e.target.value })}
                 >
                   <option value="all">All Dates ({timeSeries.length})</option>
                   {availableDates.map(d => {
@@ -1805,6 +1637,15 @@ const BMSAnalyzer = () => {
                 </button>
               ))}
             </div>
+
+            {/* Upload New BMS Log Button */}
+            <button
+              onClick={reset}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all font-semibold shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-500/40"
+            >
+              <Upload className="w-4 h-4" />
+              Upload New BMS Log
+            </button>
 
             <button onClick={reset} className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
               <X className="w-5 h-5" />
@@ -1845,7 +1686,7 @@ const BMSAnalyzer = () => {
                   <ShieldAlert className="w-6 h-6 text-red-400" />
                   <div className="flex-1">
                     <div className="font-semibold text-red-400">{anomalies.length} Data Anomalies Detected</div>
-                    <div className="text-sm text-red-300/70">Abnormal voltage readings found - possible sensor errors or communication issues</div>
+                    <div className="text-sm text-red-300/70">Abnormal Conditions found - Check Charts, Faults, and Snapshot Playback</div>
                   </div>
                   <button onClick={() => setActiveTab('faults')} className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm">
                     View Details
@@ -1917,6 +1758,8 @@ const BMSAnalyzer = () => {
                         cursor={{ stroke: '#475569', strokeWidth: 1 }}
                         wrapperStyle={{ zIndex: 1000 }}
                         allowEscapeViewBox={{ x: true, y: true }}
+                        isAnimationActive={false}
+                        animationDuration={0}
                       />
                       <Legend />
                       <Area type="monotone" dataKey="maxCell" stroke="#10b981" fill="url(#gVolt)" name="Max (mV)" connectNulls dot={false} isAnimationActive={false} />
@@ -1947,6 +1790,8 @@ const BMSAnalyzer = () => {
                         cursor={{ stroke: '#475569', strokeWidth: 1 }}
                         wrapperStyle={{ zIndex: 1000 }}
                         allowEscapeViewBox={{ x: true, y: true }}
+                        isAnimationActive={false}
+                        animationDuration={0}
                       />
                       <Legend wrapperStyle={{ fontSize: 11 }} />
                       <Area type="monotone" dataKey="maxTemp" stroke="#f97316" strokeWidth={2} fill="url(#gTemp)" name="Max (°C)" dot={false} isAnimationActive={false} />
@@ -2015,7 +1860,7 @@ const BMSAnalyzer = () => {
                   <span className="text-sm text-slate-400 font-semibold">Quick Presets:</span>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setChartZoom({ start: 0, end: 100 })}
+                      onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 0, end: 100 } })}
                       className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
                         chartZoom.start === 0 && chartZoom.end === 100
                           ? 'bg-cyan-500 text-white shadow-lg'
@@ -2025,19 +1870,19 @@ const BMSAnalyzer = () => {
                       Full View
                     </button>
                     <button
-                      onClick={() => setChartZoom({ start: 0, end: 50 })}
+                      onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 0, end: 50 } })}
                       className="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-sm font-semibold transition-all"
                     >
                       First Half
                     </button>
                     <button
-                      onClick={() => setChartZoom({ start: 50, end: 100 })}
+                      onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 50, end: 100 } })}
                       className="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-sm font-semibold transition-all"
                     >
                       Last Half
                     </button>
                     <button
-                      onClick={() => setChartZoom({ start: 75, end: 100 })}
+                      onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 75, end: 100 } })}
                       className="px-4 py-2 bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg text-sm font-semibold transition-all"
                     >
                       Last 25%
@@ -2063,7 +1908,7 @@ const BMSAnalyzer = () => {
                 {/* Simple preset buttons with hardcoded values - NO calculations, NO dynamic updates */}
                 <div className="grid grid-cols-3 gap-2">
                   <button
-                    onClick={() => setChartZoom({ start: 0, end: 100 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 0, end: 100 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 0 && chartZoom.end === 100
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2073,7 +1918,7 @@ const BMSAnalyzer = () => {
                     Full View
                   </button>
                   <button
-                    onClick={() => setChartZoom({ start: 0, end: 25 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 0, end: 25 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 0 && chartZoom.end === 25
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2083,7 +1928,7 @@ const BMSAnalyzer = () => {
                     First 25%
                   </button>
                   <button
-                    onClick={() => setChartZoom({ start: 25, end: 50 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 25, end: 50 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 25 && chartZoom.end === 50
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2093,7 +1938,7 @@ const BMSAnalyzer = () => {
                     Second 25%
                   </button>
                   <button
-                    onClick={() => setChartZoom({ start: 50, end: 75 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 50, end: 75 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 50 && chartZoom.end === 75
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2103,7 +1948,7 @@ const BMSAnalyzer = () => {
                     Third 25%
                   </button>
                   <button
-                    onClick={() => setChartZoom({ start: 75, end: 100 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 75, end: 100 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 75 && chartZoom.end === 100
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2113,7 +1958,7 @@ const BMSAnalyzer = () => {
                     Last 25%
                   </button>
                   <button
-                    onClick={() => setChartZoom({ start: 40, end: 60 })}
+                    onClick={() => dispatch({ type: 'SET_ZOOM', payload: { start: 40, end: 60 } })}
                     className={`px-3 py-2 rounded text-xs font-semibold transition-colors ${
                       chartZoom.start === 40 && chartZoom.end === 60
                         ? 'bg-blue-700 text-white hover:bg-blue-600'
@@ -2126,352 +1971,11 @@ const BMSAnalyzer = () => {
               </div>
             </div>
 
-            <ChartCard title="Pack Voltage & State of Charge" icon={<TrendingUp className="w-4 h-4 text-emerald-400" />}>
-              <ResponsiveContainer width="100%" height={320}>
-                <ComposedChart data={zoomedChartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#475569" fontSize={11} tick={{fill: '#475569'}} />
-                  <YAxis yAxisId="l" stroke="#10b981" fontSize={11} tickFormatter={(val) => `${val}V`} />
-                  <YAxis yAxisId="r" orientation="right" stroke="#8b5cf6" fontSize={11} domain={[0, 100]} tickFormatter={(val) => `${val}%`} />
+            <PackSocChart data={zoomedChartData} dateChangeMarkers={dateChangeMarkers} />
 
-                  {/* SOC reference lines */}
-                  <ReferenceLine yAxisId="r" y={20} label={{ position: 'right', value: 'Low', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
-                  <ReferenceLine yAxisId="r" y={80} label={{ position: 'right', value: 'High', fill: '#10b981', fontSize: 10 }} stroke="#10b981" strokeDasharray="3 3" />
+            <CellVoltageChart data={zoomedChartData} cellCount={stats?.cellCount} dateChangeMarkers={dateChangeMarkers} />
 
-                  {/* Date change markers - vertical lines showing when recording spans multiple dates */}
-                  {dateChangeMarkers.map((marker, idx) => (
-                    <ReferenceLine
-                      key={`date-${idx}`}
-                      x={marker.time}
-                      stroke="#64748b"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      label={{
-                        value: marker.label,
-                        position: 'top',
-                        fill: '#94a3b8',
-                        fontSize: 11,
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  ))}
-
-                  <Tooltip
-                    contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: '12px' }}
-                    cursor={{ stroke: '#475569', strokeWidth: 1 }}
-                    wrapperStyle={{ zIndex: 1000 }}
-                    allowEscapeViewBox={{ x: true, y: true }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line yAxisId="l" type="monotone" dataKey="packV" stroke="#10b981" dot={false} strokeWidth={2} name="Pack V" isAnimationActive={false} />
-                  <Line yAxisId="r" type="monotone" dataKey="soc" stroke="#8b5cf6" dot={false} strokeWidth={2} name="SOC %" isAnimationActive={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title={`Cell Voltage Precision (${stats?.cellCount} cells)`} icon={<Activity className="w-4 h-4 text-cyan-400" />}>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={zoomedChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    {/* Glow effect for the Min/Max lines - Enhanced */}
-                    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
-                      <feMerge>
-                        <feMergeNode in="blur"/>
-                        <feMergeNode in="blur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                      </feMerge>
-                    </filter>
-                    {/* Drop shadow for emphasis */}
-                    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
-                      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-                      <feOffset dx="0" dy="0" result="offsetblur"/>
-                      <feComponentTransfer>
-                        <feFuncA type="linear" slope="0.8"/>
-                      </feComponentTransfer>
-                      <feMerge>
-                        <feMergeNode/>
-                        <feMergeNode in="SourceGraphic"/>
-                      </feMerge>
-                    </filter>
-                  </defs>
-
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#475569" fontSize={11} tick={{fill: '#475569'}} />
-                  <YAxis
-                    domain={['dataMin - 50', 'dataMax + 50']}
-                    stroke="#475569"
-                    fontSize={11}
-                    tickFormatter={(val) => `${val}mV`}
-                  />
-
-                  {/* Threshold Lines */}
-                  <ReferenceLine y={4200} label={{ position: 'right', value: 'OV', fill: '#ef4444', fontSize: 11 }} stroke="#ef4444" strokeDasharray="5 5" />
-                  <ReferenceLine y={2800} label={{ position: 'right', value: 'UV', fill: '#ef4444', fontSize: 11 }} stroke="#ef4444" strokeDasharray="5 5" />
-
-                  {/* Date change markers */}
-                  {dateChangeMarkers.map((marker, idx) => (
-                    <ReferenceLine
-                      key={`date-${idx}`}
-                      x={marker.time}
-                      stroke="#64748b"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      label={{
-                        value: marker.label,
-                        position: 'top',
-                        fill: '#94a3b8',
-                        fontSize: 11,
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  ))}
-
-                  <Tooltip
-                    shared={true}
-                    isAnimationActive={false}
-                    allowEscapeViewBox={{ x: true, y: true }}
-                    cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
-                    wrapperStyle={{ zIndex: 1000 }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload || !payload.length) return null;
-                      const data = payload[0].payload;
-
-                      // Extract all cell voltages
-                      const cellVoltages = [];
-                      for (let i = 0; i < (stats?.cellCount || 0); i++) {
-                        const cellKey = `cell${i}`;
-                        if (data[cellKey] != null) {
-                          cellVoltages.push({ cell: i + 1, voltage: data[cellKey] });
-                        }
-                      }
-
-                      // Sort by voltage (descending)
-                      cellVoltages.sort((a, b) => b.voltage - a.voltage);
-
-                      return (
-                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 shadow-xl max-w-xs">
-                          <div className="text-xs text-slate-400 mb-2 font-semibold">{data.time}</div>
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-4 border-b border-slate-700 pb-1.5">
-                              <span className="text-emerald-400 font-semibold">Pack Max:</span>
-                              <span className="text-emerald-400 font-bold">{data.maxCell}mV</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 border-b border-slate-700 pb-1.5">
-                              <span className="text-blue-400 font-semibold">Pack Min:</span>
-                              <span className="text-blue-400 font-bold">{data.minCell}mV</span>
-                            </div>
-
-                            {/* Show only top 5 and bottom 5 cells to keep tooltip compact */}
-                            {cellVoltages.length > 10 ? (
-                              <>
-                                <div className="text-xs text-slate-500 mt-2 mb-1">Highest 5 Cells:</div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                                  {cellVoltages.slice(0, 5).map(({ cell, voltage }) => (
-                                    <div key={cell} className="flex justify-between">
-                                      <span className="text-slate-400">Cell #{cell}:</span>
-                                      <span className="text-white font-mono">{voltage}mV</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="text-xs text-slate-500 mt-2 mb-1">Lowest 5 Cells:</div>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                                  {cellVoltages.slice(-5).reverse().map(({ cell, voltage }) => (
-                                    <div key={cell} className="flex justify-between">
-                                      <span className="text-slate-400">Cell #{cell}:</span>
-                                      <span className="text-white font-mono">{voltage}mV</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs mt-2">
-                                {cellVoltages.map(({ cell, voltage }) => (
-                                  <div key={cell} className="flex justify-between">
-                                    <span className="text-slate-400">Cell #{cell}:</span>
-                                    <span className="text-white font-mono">{voltage}mV</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-
-                  {/* Pack Max and Min - Simplified for performance (no glow effects) */}
-                  <Line
-                    type="monotone"
-                    dataKey="maxCell"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    dot={false}
-                    name="Pack Max"
-                    connectNulls
-                    isAnimationActive={false}
-                    activeDot={{ r: 20, fill: '#10b981', opacity: 0.3 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="minCell"
-                    stroke="#3b82f6"
-                    strokeWidth={3}
-                    dot={false}
-                    name="Pack Min"
-                    connectNulls
-                    isAnimationActive={false}
-                    activeDot={{ r: 20, fill: '#3b82f6', opacity: 0.3 }}
-                  />
-
-                  {/* Individual Cell Lines - Simplified rendering */}
-                  {Array.from({ length: stats?.cellCount || 0 }, (_, i) => (
-                    <Line
-                      key={i}
-                      type="monotone"
-                      dataKey={`cell${i}`}
-                      stroke={`hsl(${i * (360 / stats.cellCount)}, 70%, 60%)`}
-                      dot={false}
-                      strokeWidth={1.2}
-                      opacity={0.6}
-                      connectNulls
-                      activeDot={false}
-                      name={`Cell #${i+1}`}
-                      isAnimationActive={false}
-                      legendType="none"
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            <ChartCard title="Cell Imbalance (Δ) - Balance Health Monitor" icon={<AlertTriangle className="w-4 h-4 text-red-400" />}>
-              <ResponsiveContainer width="100%" height={220}>
-                <LineChart data={zoomedChartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="time" stroke="#475569" fontSize={11} tick={{fill: '#475569'}} />
-                  <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `${val}mV`} />
-
-                  {/* GOOD threshold: <30mV (GREEN) */}
-                  <ReferenceLine y={30} label={{ position: 'right', value: 'Good <30mV', fill: '#10b981', fontSize: 10 }} stroke="#10b981" strokeDasharray="3 3" opacity={0.5} />
-                  {/* MARGINAL threshold: 30-150mV (YELLOW) */}
-                  <ReferenceLine y={150} label={{ position: 'right', value: 'Warning 150mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
-
-                  <Tooltip
-                    shared={true}
-                    isAnimationActive={false}
-                    contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 8, fontSize: '12px' }}
-                    cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
-                    wrapperStyle={{ zIndex: 1000 }}
-                    allowEscapeViewBox={{ x: true, y: true }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload || !payload.length) return null;
-                      const data = payload[0].payload;
-                      const value = data.cellDiff;
-
-                      // Find active faults at this timestamp
-                      const ts = new Date(data.fullTime).getTime();
-                      const activeFaults = faultEvents.filter(f => {
-                        if (!f.startTime) return false;
-                        const startTs = f.startTime.getTime();
-                        const endTs = f.endTime ? f.endTime.getTime() : Date.now();
-                        return ts >= startTs && ts <= endTs;
-                      });
-
-                      let statusColor = '#10b981';
-                      let statusText = 'GOOD';
-                      if (value >= 150) {
-                        statusColor = '#ef4444';
-                        statusText = 'BAD';
-                      } else if (value >= 30) {
-                        statusColor = '#f59e0b';
-                        statusText = 'Monitor';
-                      }
-
-                      return (
-                        <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 shadow-xl">
-                          <div className="text-xs text-slate-400 mb-2">{data.time}</div>
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-slate-300">Δ mV:</span>
-                              <span className="font-bold" style={{ color: statusColor }}>
-                                {value}mV ({statusText})
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="text-slate-300">Status:</span>
-                              <span className={`font-semibold ${
-                                data.systemState === 'Charging' ? 'text-emerald-400' :
-                                data.systemState === 'Discharging' ? 'text-cyan-400' : 'text-slate-400'
-                              }`}>
-                                {data.systemState || 'Standby'}
-                              </span>
-                            </div>
-                            {activeFaults.length > 0 && (
-                              <div className="border-t border-slate-700 pt-2 mt-2">
-                                <div className="text-xs text-red-400 font-semibold mb-1">Active Faults:</div>
-                                <div className="space-y-0.5">
-                                  {activeFaults.slice(0, 3).map((f, i) => (
-                                    <div key={i} className="text-xs text-red-300">
-                                      • {f.name} (Lvl {f.severity})
-                                    </div>
-                                  ))}
-                                  {activeFaults.length > 3 && (
-                                    <div className="text-xs text-red-400">
-                                      +{activeFaults.length - 3} more
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            {activeFaults.length === 0 && (
-                              <div className="flex items-center gap-2 text-xs text-emerald-400">
-                                <CheckCircle className="w-3 h-3" />
-                                <span>No Active Faults</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  {/* Multi-layer line with color-coded segments */}
-                  <Line
-                    type="monotone"
-                    dataKey="cellDiff"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    dot={false}
-                    name="Δ mV (Max-Min)"
-                    connectNulls
-                    isAnimationActive={false}
-                    activeDot={{ r: 20, fill: '#10b981', opacity: 0.3 }}
-                  />
-                  {/* Overlay data with conditional colors - this creates the effect */}
-                  {zoomedChartData.map((d, i) => {
-                    if (!d.cellDiff) return null;
-                    let color = '#10b981'; // Green (GOOD)
-                    if (d.cellDiff >= 150) color = '#ef4444'; // Red (BAD)
-                    else if (d.cellDiff >= 30) color = '#f59e0b'; // Yellow (MARGINAL)
-
-                    return (
-                      <Line
-                        key={`segment-${i}`}
-                        data={[d]}
-                        type="monotone"
-                        dataKey="cellDiff"
-                        stroke={color}
-                        strokeWidth={3}
-                        dot={false}
-                        connectNulls
-                        isAnimationActive={false}
-                        legendType="none"
-                      />
-                    );
-                  })}
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
+            <CellImbalanceChart data={zoomedChartData} faultEvents={faultEvents} />
           </div>
             )}
           </>
@@ -2762,13 +2266,13 @@ const BMSAnalyzer = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <button onClick={() => setPlaybackIdx(0)} className="p-2 hover:bg-slate-800 rounded-lg"><SkipBack className="w-4 h-4" /></button>
-                <button onClick={() => setPlaybackIdx(Math.max(0, playbackIdx - 10))} className="px-2 py-1 text-xs hover:bg-slate-800 rounded">−10</button>
-                <button onClick={() => setIsPlaying(!isPlaying)} className={`p-2 rounded-lg ${isPlaying ? 'bg-red-600' : 'bg-emerald-600'}`}>
+                <button onClick={() => dispatch({ type: 'SET_PLAYBACK_IDX', payload: 0 })} className="p-2 hover:bg-slate-800 rounded-lg"><SkipBack className="w-4 h-4" /></button>
+                <button onClick={() => dispatch({ type: 'SET_PLAYBACK_IDX', payload: Math.max(0, playbackIdx - 10) })} className="px-2 py-1 text-xs hover:bg-slate-800 rounded">−10</button>
+                <button onClick={() => dispatch({ type: 'TOGGLE_PLAYING' })} className={`p-2 rounded-lg ${isPlaying ? 'bg-red-600' : 'bg-emerald-600'}`}>
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
-                <button onClick={() => setPlaybackIdx(Math.min(filteredData.length - 1, playbackIdx + 10))} className="px-2 py-1 text-xs hover:bg-slate-800 rounded">+10</button>
-                <button onClick={() => setPlaybackIdx(filteredData.length - 1)} className="p-2 hover:bg-slate-800 rounded-lg"><SkipForward className="w-4 h-4" /></button>
+                <button onClick={() => dispatch({ type: 'SET_PLAYBACK_IDX', payload: Math.min(filteredData.length - 1, playbackIdx + 10) })} className="px-2 py-1 text-xs hover:bg-slate-800 rounded">+10</button>
+                <button onClick={() => dispatch({ type: 'SET_PLAYBACK_IDX', payload: filteredData.length - 1 })} className="p-2 hover:bg-slate-800 rounded-lg"><SkipForward className="w-4 h-4" /></button>
 
                 {/* Playback Speed Controls */}
                 <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg px-2 py-1 border border-slate-700">
@@ -2776,7 +2280,7 @@ const BMSAnalyzer = () => {
                   {[0.25, 0.5, 1, 2, 4].map(speed => (
                     <button
                       key={speed}
-                      onClick={() => setPlaybackSpeed(speed)}
+                      onClick={() => dispatch({ type: 'SET_PLAYBACK_SPEED', payload: speed })}
                       className={`px-2 py-1 text-xs rounded transition-all ${
                         playbackSpeed === speed
                           ? 'bg-cyan-600 text-white font-bold'
@@ -2790,7 +2294,7 @@ const BMSAnalyzer = () => {
 
                 <div className="flex-1">
                   <input type="range" min={0} max={filteredData.length - 1} value={playbackIdx}
-                    onChange={e => setPlaybackIdx(+e.target.value)} className="w-full accent-emerald-500" />
+                    onChange={e => dispatch({ type: 'SET_PLAYBACK_IDX', payload: +e.target.value })} className="w-full accent-emerald-500" />
                 </div>
 
                 <div className="text-right min-w-[180px]">
