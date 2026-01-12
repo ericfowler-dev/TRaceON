@@ -918,7 +918,7 @@ const BMSAnalyzer = () => {
             <img src="traceon-logo.png" alt="TRaceON" className="h-9" />
             <div className="flex flex-col">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">BMS Analyzer</span>
-              <span className="text-[10px] text-slate-600">v1.3.0</span>
+              <span className="text-[10px] text-slate-600">v1.3.1</span>
             </div>
           </div>
           {fileName && (
