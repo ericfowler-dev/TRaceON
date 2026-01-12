@@ -897,76 +897,145 @@ const BMSAnalyzer = () => {
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* Header */}
-      <header className="bg-slate-900/80 border-b border-slate-800 sticky top-0 z-50 backdrop-blur">
-        <div className="w-full px-8 py-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            {/* TRaceON Logo */}
-            <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
-            <div className="border-l border-slate-700 pl-4">
-              <h1 className="text-lg font-semibold">{fileName}</h1>
-              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.2</p>
+      {/* Navigation Bar - Pill Buttons */}
+      <nav className="flex items-center justify-between mx-4 mt-4 mb-4 bg-[#0a0f1d] border border-slate-700 p-2 rounded-lg">
+        {/* Left Side - Logo & Title */}
+        <div className="flex items-center gap-4 pl-2">
+          {/* TRaceON Logo with Version */}
+          <div className="flex items-center gap-3">
+            <img src="traceon-logo.png" alt="TRaceON" className="h-9" />
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">BMS Analyzer</span>
+              <span className="text-[10px] text-slate-600">v1.3.0</span>
             </div>
           </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Date Filter */}
-            {availableDates.length > 1 && (
-              <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2">
-                <Calendar className="w-4 h-4 text-cyan-400" />
-                <select
-                  id="date-filter"
-                  name="dateFilter"
-                  className="bg-transparent border-none text-sm font-medium cursor-pointer focus:outline-none"
-                  value={selectedDate}
-                  onChange={(e) => dispatch({ type: 'SET_DATE', payload: e.target.value })}
-                >
-                  <option value="all">All Dates ({timeSeries.length})</option>
-                  {availableDates.map(d => {
-                    const count = timeSeries.filter(t => t.dateKey === d).length;
-                    return <option key={d} value={d}>{d} ({count})</option>;
-                  })}
-                </select>
-              </div>
-            )}
-
-            {/* Navigation Tabs - Professional Modern Design */}
-            <div className="flex items-center gap-3">
-              {['overview', 'charts', 'faults', 'snapshot', 'raw'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-7 py-3.5 rounded-xl text-base font-semibold transition-all duration-200 relative ${
-                    activeTab === tab
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/40 hover:bg-blue-500 hover:shadow-xl hover:shadow-blue-500/50'
-                      : 'bg-slate-800/60 text-slate-400 hover:text-white hover:bg-slate-700/80 hover:shadow-md border border-slate-700/50 hover:border-slate-600'
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  {tab === 'faults' && stats?.anomalies > 0 && (
-                    <span className="ml-2 px-2.5 py-1 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse shadow-lg">
-                      {stats.anomalies}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Upload New BMS Log Button */}
-            <button
-              onClick={reset}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-all font-semibold shadow-lg shadow-emerald-600/30 hover:shadow-xl hover:shadow-emerald-500/40"
-            >
-              <Upload className="w-4 h-4" />
-              Upload New BMS Log
-            </button>
-
-            <button onClick={reset} className="p-2.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          {fileName && (
+            <>
+              <div className="h-8 w-px bg-slate-700" />
+              <span className="text-sm text-slate-400">{fileName}</span>
+            </>
+          )}
         </div>
-      </header>
+
+        {/* Right Side - Navigation Pills */}
+        <div className="flex items-center gap-2">
+          {/* Date Filter - if multiple dates */}
+          {availableDates.length > 1 && (
+            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-full px-3 py-1.5 mr-2">
+              <Calendar className="w-4 h-4 text-cyan-400" />
+              <select
+                id="date-filter"
+                name="dateFilter"
+                className="bg-transparent border-none text-sm font-medium cursor-pointer focus:outline-none"
+                value={selectedDate}
+                onChange={(e) => dispatch({ type: 'SET_DATE', payload: e.target.value })}
+              >
+                <option value="all">All Dates ({timeSeries.length})</option>
+                {availableDates.map(d => {
+                  const count = timeSeries.filter(t => t.dateKey === d).length;
+                  return <option key={d} value={d}>{d} ({count})</option>;
+                })}
+              </select>
+            </div>
+          )}
+
+          {/* Overview */}
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'overview'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Overview
+          </button>
+
+          {/* Charts */}
+          <button
+            onClick={() => setActiveTab('charts')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'charts'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Charts
+          </button>
+
+          {/* Anomalies */}
+          <button
+            onClick={() => setActiveTab('faults')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'faults'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <span>Anomalies</span>
+            {stats?.anomalies > 0 && (
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded ml-2 font-bold inline-flex items-center justify-center min-w-[20px] h-[20px]">
+                {stats.anomalies}
+              </span>
+            )}
+          </button>
+
+          {/* Faults */}
+          <button
+            onClick={() => setActiveTab('faults')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'faults'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <span>Faults</span>
+            {stats?.faults?.total > 0 && (
+              <span className={`text-white text-xs px-2 py-0.5 rounded ml-2 font-bold inline-flex items-center justify-center min-w-[20px] h-[20px] ${
+                stats.faults.l3 > 0 ? 'bg-red-500' : 'bg-orange-500'
+              }`}>
+                {stats.faults.total}
+              </span>
+            )}
+          </button>
+
+          {/* Snapshot */}
+          <button
+            onClick={() => setActiveTab('snapshot')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'snapshot'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Snapshot
+          </button>
+
+          {/* Raw */}
+          <button
+            onClick={() => setActiveTab('raw')}
+            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
+              activeTab === 'raw'
+                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
+                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            Raw
+          </button>
+
+          {/* Spacer */}
+          <div className="w-4" />
+
+          {/* Upload New BMS Log Button */}
+          <button
+            onClick={reset}
+            className="px-6 py-2.5 rounded-full text-base font-bold bg-emerald-500 text-white hover:bg-green-500 transition-colors flex items-center gap-2"
+          >
+            <Upload className="w-5 h-5" />
+            Upload new BMS Log
+          </button>
+        </div>
+      </nav>
 
       <main className="w-full px-6 py-6 space-y-8 mx-auto" style={{ maxWidth: '98%' }}>
 
@@ -1731,159 +1800,241 @@ const BMSAnalyzer = () => {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* System State Details */}
+              {/* System Details - Option 1 Style */}
               <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
-                <h3 className="text-base text-slate-300 mb-5 flex items-center gap-2 font-semibold">
-                  <Camera className="w-5 h-5 text-cyan-400" /> System Details
-                </h3>
-                <div className="space-y-1 text-sm font-mono">
-                  <Row label="Pack V" value={`${fmt(currentSnap.packVoltage)}V`} />
-                  <Row label="Current" value={`${fmt(currentSnap.current, 1)}A`} />
-                  <Row label="Shown SOC" value={`${fmt(currentSnap.soc)}%`} />
-                  <Row label="Real SOC" value={`${fmt(currentSnap.realSoc)}%`} />
-                  <Row label="SOH" value={`${fmt(currentSnap.soh)}%`} />
-                  <Row label="Cell Δ" value={`${currentSnap.cellDiff != null ? currentSnap.cellDiff.toFixed(0) : '—'}mV`} />
-                  <Row label="Max Cell" value={`${currentSnap.maxCellV != null ? currentSnap.maxCellV.toFixed(0) : '—'}mV (${currentSnap.maxCellId ?? '—'})`} />
-                  <Row label="Min Cell" value={`${currentSnap.minCellV != null ? currentSnap.minCellV.toFixed(0) : '—'}mV (${currentSnap.minCellId ?? '—'})`} />
-                  <div className="border-t border-slate-700 pt-2 mt-2 space-y-1.5">
-                    <Row label="Sys Insul" value={formatInsulation(currentSnap.insulationRes)} />
-                    <Row label="Pos Insul" value={formatInsulation(currentSnap.posInsulation)} />
-                    <Row label="Neg Insul" value={formatInsulation(currentSnap.negInsulation)} />
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-3">
+                  <Cpu className="w-4 h-4 text-cyan-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">System Details</h3>
+                </div>
+                <div className="space-y-3">
+                  {/* Pack Data */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Pack Voltage</span>
+                    <span className="font-mono text-sm font-semibold text-cyan-400">{fmt(currentSnap.packVoltage, 3)} V</span>
                   </div>
-                  <div className="border-t border-slate-700 pt-2 mt-2 space-y-1.5">
-                    <Row label="HV1 (Batt)" value={currentSnap.hv1 != null ? `${fmt(currentSnap.hv1, 1)}V` : '—'} />
-                    <Row label="HV2 (Load)" value={currentSnap.hv2 != null ? `${fmt(currentSnap.hv2, 1)}V` : '—'} />
-                    <Row label="HV3" value={currentSnap.hv3 != null ? `${fmt(currentSnap.hv3, 1)}V` : '—'} />
-                    <Row label="Bus Δ (HV1-HV2)" value={
-                      currentSnap.hv1 != null && currentSnap.hv2 != null
-                        ? `${fmt(currentSnap.hv1 - currentSnap.hv2, 2)}V`
-                        : '—'
-                    } />
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Pack Current</span>
+                    <span className="font-mono text-sm font-semibold text-cyan-400">{currentSnap.current >= 0 ? '+' : ''}{fmt(currentSnap.current, 3)} A</span>
                   </div>
-                  <div className="border-t border-slate-700 pt-2 mt-2 space-y-1.5">
-                    <Row label="SW1" value={currentSnap.sw1 ?? '—'} />
-                    <Row label="SW2" value={currentSnap.sw2 ?? '—'} />
-                    <Row label="DI1" value={currentSnap.di1 ?? '—'} />
-                    <Row label="DI2" value={currentSnap.di2 ?? '—'} />
-                    <Row label="Heartbeat" value={currentSnap.heartbeat ?? '—'} />
-                    <Row label="Power V" value={currentSnap.powerVolt ? `${fmt(currentSnap.powerVolt)}mV` : '—'} />
+
+                  {/* Cell Stats */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Min Cell Voltage</span>
+                    <span className="font-mono text-sm font-semibold text-emerald-500">{currentSnap.minCellV != null ? (currentSnap.minCellV / 1000).toFixed(3) : '—'} V</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Max Cell Voltage</span>
+                    <span className="font-mono text-sm font-semibold text-emerald-500">{currentSnap.maxCellV != null ? (currentSnap.maxCellV / 1000).toFixed(3) : '—'} V</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Cell Delta</span>
+                    <span className="font-mono text-sm font-semibold text-amber-500">{currentSnap.cellDiff != null ? currentSnap.cellDiff.toFixed(0) : '—'} mV</span>
+                  </div>
+
+                  {/* SOC/SOH */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">SOC (Shown)</span>
+                    <span className="font-mono text-sm font-semibold text-slate-100">{fmt(currentSnap.soc)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">SOC (Real)</span>
+                    <span className="font-mono text-sm font-semibold text-slate-100">{fmt(currentSnap.realSoc)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">SOH</span>
+                    <span className="font-mono text-sm font-semibold text-slate-100">{fmt(currentSnap.soh)}%</span>
+                  </div>
+
+                  {/* Insulation Section */}
+                  <div className="border-t border-slate-700 pt-3 mt-1 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">System Insulation</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{formatInsulation(currentSnap.insulationRes)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">Pos Insulation</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{formatInsulation(currentSnap.posInsulation)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">Neg Insulation</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{formatInsulation(currentSnap.negInsulation)}</span>
+                    </div>
+                  </div>
+
+                  {/* HV Section */}
+                  <div className="border-t border-slate-700 pt-3 mt-1 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">HV1 (Battery)</span>
+                      <span className="font-mono text-sm font-semibold text-cyan-400">{currentSnap.hv1 != null ? `${fmt(currentSnap.hv1, 1)} V` : '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">HV2 (Load)</span>
+                      <span className="font-mono text-sm font-semibold text-cyan-400">{currentSnap.hv2 != null ? `${fmt(currentSnap.hv2, 1)} V` : '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">Bus Delta</span>
+                      <span className="font-mono text-sm font-semibold text-amber-500">
+                        {currentSnap.hv1 != null && currentSnap.hv2 != null ? `${fmt(currentSnap.hv1 - currentSnap.hv2, 2)} V` : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Digital Inputs Section */}
+                  <div className="border-t border-slate-700 pt-3 mt-1 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">SW1 / SW2</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{currentSnap.sw1 ?? '—'} / {currentSnap.sw2 ?? '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">DI1 / DI2</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{currentSnap.di1 ?? '—'} / {currentSnap.di2 ?? '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">Heartbeat</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{currentSnap.heartbeat ?? '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-300">Power Voltage</span>
+                      <span className="font-mono text-sm font-semibold text-slate-100">{currentSnap.powerVolt ? `${fmt(currentSnap.powerVolt)} mV` : '—'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Relay States */}
+              {/* Relay States - Enhanced styling with glowing indicators */}
               <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
-                <h3 className="text-base text-slate-300 mb-5 flex items-center gap-2 font-semibold">
-                  <Zap className="w-5 h-5 text-amber-400" /> Relay Status
-                </h3>
+                <div className="flex items-center gap-2 mb-4 border-b border-slate-700 pb-3">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Relay Status</h3>
+                </div>
                 <div className="space-y-3">
                   {ALL_RELAYS.map(id => {
                     const state = currentSnap.relays?.[id] || 'OFF';
+                    const isSticking = state === 'STICKING';
+                    const isOn = state === 'ON';
                     return (
-                      <div key={id} className="flex items-center justify-between bg-slate-800/50 rounded-lg p-3 transition-all hover:bg-slate-800">
+                      <div key={id} className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${
+                        isSticking ? 'bg-red-950/30 border border-red-900/50' : 'hover:bg-white/5'
+                      }`}>
                         <div className="flex items-center gap-3">
-                          <div className={`w-5 h-5 rounded-full transition-all flex items-center justify-center ${
-                            state === 'ON' ? 'bg-emerald-500 shadow-lg shadow-emerald-500/50 ring-2 ring-emerald-400/30' :
-                            state === 'STICKING' ? 'bg-red-500 shadow-lg shadow-red-500/50 ring-2 ring-red-400/30' :
-                            'bg-slate-600'
-                          }`}>
-                            {state === 'ON' && <div className="w-2 h-2 bg-white rounded-full animate-pulse" />}
-                            {state === 'STICKING' && <AlertTriangle className="w-3 h-3 text-white animate-pulse" />}
-                          </div>
+                          {/* Status Light with Enhanced Glow */}
+                          <div className={`w-4 h-4 rounded-full transition-all ${
+                            isOn
+                              ? 'bg-emerald-400 shadow-[0_0_8px_2px_rgba(34,197,94,0.6),0_0_16px_4px_rgba(34,197,94,0.3),0_0_24px_8px_rgba(34,197,94,0.1)] ring-2 ring-emerald-400/30'
+                              : isSticking
+                              ? 'bg-red-500 shadow-[0_0_8px_2px_rgba(239,68,68,0.7),0_0_16px_4px_rgba(239,68,68,0.4),0_0_24px_8px_rgba(239,68,68,0.2)] ring-2 ring-red-400/40 animate-pulse'
+                              : 'bg-slate-600'
+                          }`} />
                           <div>
-                            <div className="text-sm font-semibold text-white">{relayConfig[id]}</div>
-                            <div className="text-xs text-slate-500">{id}</div>
+                            <p className={`text-base leading-tight ${
+                              isSticking ? 'text-red-300 font-semibold' :
+                              isOn ? 'text-slate-100 font-medium' : 'text-slate-200'
+                            }`}>
+                              {relayConfig[id]}
+                            </p>
+                            <p className="text-[11px] text-slate-500 uppercase">{id}</p>
                           </div>
                         </div>
-                        <div className={`text-sm font-bold px-3 py-1.5 rounded-md transition-all ${
-                          state === 'ON' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                          state === 'STICKING' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                          'bg-slate-700 text-slate-400'
+                        <span className={`text-xs font-bold px-3 py-1.5 rounded ${
+                          isOn
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_10px_rgba(34,197,94,0.2)]'
+                            : isSticking
+                            ? 'bg-red-500/30 text-red-300 border border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.3)] animate-pulse'
+                            : 'bg-slate-800 text-slate-400'
                         }`}>
-                          {state}
-                        </div>
+                          {isOn ? 'ON' : isSticking ? 'STICKING' : 'OFF'}
+                        </span>
                       </div>
                     );
                   })}
                 </div>
 
-                {/* 12V AUX Configuration - Only show for 80V batteries */}
-                {stats?.cellCount >= 24 && stats?.cellCount < 30 && (
-                  <div className="mt-5 p-5 rounded-xl border-2 border-cyan-500/30 bg-slate-900/80 shadow-lg shadow-cyan-500/5">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                          <Zap className="w-5 h-5 text-cyan-400" />
+                {/* 12V AUX Configuration - Under Relay Status */}
+                {stats && (
+                  <>
+                    <div className="h-5" />
+                    <div className="bg-[#0f1d2a] rounded-lg border border-cyan-800/40 p-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <Settings className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-cyan-100">12V AUX System Configuration</h4>
                         </div>
-                        <div>
-                          <h3 className="text-base font-bold text-white">12V AUX System Configuration</h3>
-                          <p className="text-xs text-slate-400">Configure relay mapping for your battery type</p>
-                        </div>
-                      </div>
-                      <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
-                        has12VAux ? 'text-cyan-400' : 'text-slate-500'
-                      }`}>
-                        {has12VAux ? '12V AUX Enabled' : 'Standard Configuration'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-4">
-                      <button
-                        onClick={() => setHas12VAux(false)}
-                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
-                          !has12VAux
-                            ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
-                            : 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
-                        }`}
-                      >
-                        <Settings className="w-7 h-7 mb-2" />
-                        <span className="text-sm font-bold uppercase tracking-tight">Standard</span>
-                        <span className="text-xs mt-1 opacity-70">No 12V AUX</span>
-                      </button>
-                      <button
-                        onClick={() => setHas12VAux(true)}
-                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
+                        <span className={`text-[9px] font-bold px-2 py-1 rounded border ${
                           has12VAux
-                            ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
-                            : 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
-                        }`}
-                      >
-                        <Battery className="w-7 h-7 mb-2" />
-                        <span className="text-sm font-bold uppercase tracking-tight">12V Auxiliary</span>
-                        <span className="text-xs mt-1 opacity-70">Enable AUX Names</span>
-                      </button>
-                    </div>
+                            ? 'text-cyan-400 bg-cyan-950 border-cyan-800/50'
+                            : 'text-slate-400 bg-slate-800 border-slate-700'
+                        }`}>
+                          {has12VAux ? '12V AUX ENABLED' : 'STANDARD'}
+                        </span>
+                      </div>
 
-                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-                      <p className="text-xs text-slate-400 leading-relaxed">
-                        <strong className="text-slate-300">Default:</strong> Standard relay configuration. If your battery has a 12V auxiliary system, select "12V Auxiliary" to show correct relay names and mapping.
-                      </p>
-                      <details className="mt-3 pt-3 border-t border-slate-700">
-                        <summary className="flex items-center gap-1 text-xs font-bold text-cyan-400 uppercase cursor-pointer hover:underline">
-                          <ChevronDown className="w-4 h-4" />
-                          Technical Details
-                        </summary>
-                        <div className="mt-3 p-3 bg-slate-900/50 rounded border border-slate-700">
-                          <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Relay Mapping Changes</h4>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
-                            <span className="text-slate-500">Relay 3:</span>
-                            <span className="text-slate-300">{has12VAux ? 'Pre-charge Relay' : 'Alarm Relay'}</span>
-                            <span className="text-slate-500">Relay 4:</span>
-                            <span className="text-slate-300">{has12VAux ? 'Negative Relay' : 'Pre-charge Relay'}</span>
-                            <span className="text-slate-500">Relay 5:</span>
-                            <span className="text-slate-300">{has12VAux ? 'DC/DC Relay' : 'Negative Relay'}</span>
-                          </div>
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <button
+                          onClick={() => setHas12VAux(false)}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border transition-all ${
+                            !has12VAux
+                              ? 'border-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20'
+                              : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800 opacity-60'
+                          }`}
+                        >
+                          <Cpu className={`w-5 h-5 mb-1 ${!has12VAux ? 'text-cyan-400' : 'text-slate-400'}`} />
+                          <span className={`text-[11px] font-bold uppercase ${!has12VAux ? 'text-white' : 'text-slate-400'}`}>Standard</span>
+                          <span className="text-[9px] text-slate-500">No 12V AUX</span>
+                        </button>
+                        <button
+                          onClick={() => setHas12VAux(true)}
+                          className={`flex flex-col items-center justify-center p-4 rounded-lg border transition-all ${
+                            has12VAux
+                              ? 'border-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20'
+                              : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800 opacity-60'
+                          }`}
+                        >
+                          <Battery className={`w-5 h-5 mb-1 ${has12VAux ? 'text-cyan-400' : 'text-slate-400'}`} />
+                          <span className={`text-[11px] font-bold uppercase ${has12VAux ? 'text-white' : 'text-slate-400'}`}>12V Auxiliary</span>
+                          <span className={`text-[9px] ${has12VAux ? 'text-cyan-300/70' : 'text-slate-500'}`}>Enable AUX Names</span>
+                        </button>
+                      </div>
+
+                      <div className="bg-black/20 p-3 rounded text-[10px] text-slate-400 leading-relaxed border border-white/5">
+                        <div className="flex gap-2 items-start mb-1">
+                          <Info className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <p><strong className="text-slate-300">Default:</strong> Standard relay configuration. If your battery has a 12V auxiliary system, select "12V Auxiliary" to show correct relay names and mapping.</p>
                         </div>
-                      </details>
-                    </div>
 
-                    <div className="flex items-center gap-2 mt-3 p-2.5 rounded bg-amber-500/10 border border-amber-500/20">
-                      <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                      <p className="text-xs font-medium text-amber-500">
-                        Changes apply instantly to relay names displayed above.
-                      </p>
+                        {/* Technical Details - Relay Mapping Cross Reference */}
+                        <details className="mt-3 pt-3 border-t border-white/5">
+                          <summary className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 uppercase cursor-pointer hover:underline">
+                            <ChevronDown className="w-4 h-4" />
+                            Technical Details
+                          </summary>
+                          <div className="mt-3 p-3 bg-slate-900/50 rounded border border-slate-700">
+                            <h4 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Relay Mapping Logic</h4>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] font-mono">
+                              <span className="text-slate-500">Relay 0:</span>
+                              <span className="text-slate-300">Positive Relay</span>
+                              <span className="text-slate-500">Relay 1:</span>
+                              <span className="text-slate-300">Charging Relay</span>
+                              <span className="text-slate-500">Relay 2:</span>
+                              <span className="text-slate-300">Heating Relay</span>
+                              <span className="text-slate-500">Relay 3:</span>
+                              <span className={has12VAux ? 'text-cyan-400' : 'text-slate-300'}>{has12VAux ? 'Pre-charge Relay' : 'Alarm Relay'}</span>
+                              <span className="text-slate-500">Relay 4:</span>
+                              <span className={has12VAux ? 'text-cyan-400' : 'text-slate-300'}>{has12VAux ? 'Negative Relay' : 'Pre-charge Relay'}</span>
+                              <span className="text-slate-500">Relay 5:</span>
+                              <span className={has12VAux ? 'text-cyan-400' : 'text-slate-300'}>{has12VAux ? 'DC/DC Relay' : 'Negative Relay'}</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-slate-500 italic mt-2">
+                            * Highlighted rows change based on 12V AUX selection.
+                          </p>
+                        </details>
+
+                        <p className="text-amber-500 font-semibold border-t border-white/5 mt-3 pt-2 uppercase tracking-tight">
+                          Changes apply instantly to relay names displayed above.
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
 
@@ -2104,6 +2255,39 @@ const BMSAnalyzer = () => {
                 )}
               </div>
             )}
+
+            {/* Quick Stats Footer - Inspired by new GUI design */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50 flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Internal Temperature</span>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold font-mono text-white">
+                    {currentSnap.maxTemp != null ? fmt(currentSnap.maxTemp, 1) : '—'}
+                  </span>
+                  <span className="text-sm font-medium text-slate-500 mb-1">°C</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50 flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Bus Voltage Δ</span>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold font-mono text-cyan-400">
+                    {currentSnap.hv1 != null && currentSnap.hv2 != null
+                      ? fmt(Math.abs(currentSnap.hv1 - currentSnap.hv2), 2)
+                      : '—'}
+                  </span>
+                  <span className="text-sm font-medium text-slate-500 mb-1">V</span>
+                </div>
+              </div>
+              <div className="p-4 rounded-xl border border-slate-700 bg-slate-900/50 flex flex-col gap-1">
+                <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Heartbeat</span>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold font-mono text-white">
+                    {currentSnap.heartbeat ?? '—'}
+                  </span>
+                  <span className="text-sm font-medium text-slate-500 mb-1">ms</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
