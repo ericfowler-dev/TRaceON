@@ -133,10 +133,19 @@ export const RELAY_NAMES = {
 
 // Get relay config based on cell count and optional 12V AUX flag
 export function getRelayConfig(deviceInfo, cellCount, has12VAux = false) {
+  const product = detectProduct(cellCount);
+  if (product?.key?.startsWith('96V')) {
+    return RELAY_CONFIG_BY_PRODUCT['96V'];
+  }
+  if (product?.key?.startsWith('80V')) {
+    return has12VAux
+      ? RELAY_CONFIG_BY_PRODUCT['80V_12V_AUX']
+      : RELAY_CONFIG_BY_PRODUCT['80V'];
+  }
   if (cellCount >= 30) {
     return RELAY_CONFIG_BY_PRODUCT['96V'];
-  } else if (cellCount >= 24) {
-    // 80V battery - check for 12V AUX option
+  }
+  if (cellCount >= 24) {
     return has12VAux
       ? RELAY_CONFIG_BY_PRODUCT['80V_12V_AUX']
       : RELAY_CONFIG_BY_PRODUCT['80V'];

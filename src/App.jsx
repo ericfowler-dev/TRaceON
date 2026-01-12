@@ -413,6 +413,18 @@ const BMSAnalyzer = () => {
     return RELAY_NAMES; // Fallback to legacy names if stats not available
   }, [stats, deviceInfo, has12VAux]);
 
+  const isAuxSupported = useMemo(() => {
+    if (!stats?.cellCount) return false;
+    const product = detectProduct(stats.cellCount);
+    return Boolean(product?.key?.startsWith('80V'));
+  }, [stats]);
+
+  useEffect(() => {
+    if (!isAuxSupported && has12VAux) {
+      setHas12VAux(false);
+    }
+  }, [isAuxSupported, has12VAux]);
+
   // Helper to enhance fault names with actual relay names instead of relay IDs
   const getEnhancedFaultName = (fault) => {
     if (!fault) return '';
@@ -1970,30 +1982,37 @@ const BMSAnalyzer = () => {
 
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         <button
-                          onClick={() => setHas12VAux(false)}
+                          onClick={() => isAuxSupported && setHas12VAux(false)}
+                          disabled={!isAuxSupported}
                           className={`flex flex-col items-center justify-center p-4 rounded-lg border transition-all ${
                             !has12VAux
                               ? 'border-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20'
                               : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800 opacity-60'
-                          }`}
+                          } ${!isAuxSupported ? 'opacity-50 cursor-not-allowed hover:bg-slate-900/50' : ''}`}
                         >
                           <Cpu className={`w-5 h-5 mb-1 ${!has12VAux ? 'text-cyan-400' : 'text-slate-400'}`} />
                           <span className={`text-[11px] font-bold uppercase ${!has12VAux ? 'text-white' : 'text-slate-400'}`}>Standard</span>
                           <span className="text-[9px] text-slate-500">No 12V AUX</span>
                         </button>
                         <button
-                          onClick={() => setHas12VAux(true)}
+                          onClick={() => isAuxSupported && setHas12VAux(true)}
+                          disabled={!isAuxSupported}
                           className={`flex flex-col items-center justify-center p-4 rounded-lg border transition-all ${
                             has12VAux
                               ? 'border-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20'
                               : 'border-slate-700 bg-slate-900/50 hover:bg-slate-800 opacity-60'
-                          }`}
+                          } ${!isAuxSupported ? 'opacity-50 cursor-not-allowed hover:bg-slate-900/50' : ''}`}
                         >
                           <Battery className={`w-5 h-5 mb-1 ${has12VAux ? 'text-cyan-400' : 'text-slate-400'}`} />
                           <span className={`text-[11px] font-bold uppercase ${has12VAux ? 'text-white' : 'text-slate-400'}`}>12V Auxiliary</span>
                           <span className={`text-[9px] ${has12VAux ? 'text-cyan-300/70' : 'text-slate-500'}`}>Enable AUX Names</span>
                         </button>
                       </div>
+                      {!isAuxSupported && (
+                        <div className="text-[10px] text-amber-400 font-semibold uppercase tracking-wide mb-3">
+                          12V AUX is not applicable to 96V products; relay names will not change.
+                        </div>
+                      )}
 
                       <div className="bg-black/20 p-3 rounded text-[10px] text-slate-400 leading-relaxed border border-white/5">
                         <div className="flex gap-2 items-start mb-1">
