@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python analyze_excel.py:*)",
+      "Bash(python:*)",
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(move:*)",
+      "Bash(copy \"TRaceON Logo.png\" \"public\\\\traceon-logo.png\")",
+      "Bash(copy \"TRaceON Logo_PSI.png\" \"public\\\\traceon-logo-psi.png\")",
+      "Bash(node compare-logs.js:*)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}
