@@ -8,7 +8,7 @@ import {
   ThermometerSun, Battery, Activity, Gauge, Cpu, CheckCircle,
   ShieldAlert, Calendar, ChevronDown, ChevronRight, Table, X,
   Play, Pause, SkipBack, SkipForward, Camera, TrendingUp, Info,
-  Search, Flag, Eye
+  Search, Flag, Eye, Settings
 } from 'lucide-react';
 
 // Import from extracted modules
@@ -31,6 +31,9 @@ import CellImbalanceChart from './components/charts/CellImbalanceChart';
 // =============================================================================
 const DEBUG = false;
 const PERF = false;
+const MAX_FILE_SIZE_MB = 50;
+const WARN_FILE_SIZE_MB = 20;
+const MB_BYTES = 1024 * 1024;
 
 const perfNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
@@ -152,6 +155,7 @@ const BMSAnalyzer = () => {
   const [expandedSheets, setExpandedSheets] = useState({});
   const [showAllRows, setShowAllRows] = useState({});
   const [searchTime, setSearchTime] = useState('');
+  const [has12VAux, setHas12VAux] = useState(false); // 80V battery 12V AUX option
   const workerRef = useRef(null);
 
   useEffect(() => {
@@ -227,9 +231,25 @@ const BMSAnalyzer = () => {
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) processFile(file);
+    if (e.target) e.target.value = '';
   };
 
   const processFile = (file) => {
+    const sizeMb = (file?.size || 0) / MB_BYTES;
+    if (sizeMb > MAX_FILE_SIZE_MB) {
+      setError(`Max file size is ${MAX_FILE_SIZE_MB} MB. Selected file is ${sizeMb.toFixed(1)} MB.`);
+      setIsLoading(false);
+      return;
+    }
+    if (sizeMb > WARN_FILE_SIZE_MB) {
+      const proceed = window.confirm(
+        `This file is ${sizeMb.toFixed(1)} MB. Uploading a file this large may consume significant browser resources and some features in TRaceON may not function properly.\n\nDo you want to continue?`
+      );
+      if (!proceed) {
+        setIsLoading(false);
+        return;
+      }
+    }
     setIsLoading(true);
     setError(null);
     setFileName(file.name);
@@ -237,6 +257,8 @@ const BMSAnalyzer = () => {
     setRawSheetNames([]);
     setExpandedSheets({});
     setShowAllRows({});
+    setHas12VAux(false); // Reset 12V AUX option for new file
+    setActiveTab('overview'); // Always start on overview tab for new file
     if (!workerRef.current) {
       setError('Worker not ready');
       setIsLoading(false);
@@ -383,13 +405,26 @@ const BMSAnalyzer = () => {
     return result;
   }, [filteredData, faultEvents, anomalies, selectedDate, cellIndexRange]);
 
-  // Smart relay configuration based on device info and cell count
+  // Smart relay configuration based on device info, cell count, and 12V AUX option
   const relayConfig = useMemo(() => {
     if (stats && stats.cellCount) {
-      return getRelayConfig(deviceInfo, stats.cellCount);
+      return getRelayConfig(deviceInfo, stats.cellCount, has12VAux);
     }
     return RELAY_NAMES; // Fallback to legacy names if stats not available
-  }, [stats, deviceInfo]);
+  }, [stats, deviceInfo, has12VAux]);
+
+  // Helper to enhance fault names with actual relay names instead of relay IDs
+  const getEnhancedFaultName = (fault) => {
+    if (!fault) return '';
+    // If this is a relay fault with sticking relays, enhance with actual relay names
+    if (fault.code === 'RlyFault' && fault.stickingRelays && fault.stickingRelays.length > 0) {
+      const relayNames = fault.stickingRelays
+        .map(relayId => relayConfig[relayId] || relayId)
+        .join(', ');
+      return `Relay Fault (${relayNames} Sticking)`;
+    }
+    return fault.name;
+  };
 
   // LTTB (Largest-Triangle-Three-Buckets) downsampling for performance
   // Preserves visual shape while reducing SVG overhead by intelligently selecting representative points
@@ -515,6 +550,7 @@ const BMSAnalyzer = () => {
         time: d.timeStr,
         fullTime: d.fullTime,
         dateKey: d.dateKey,
+        ts: d.ts, // timestamp in ms for fault marker lookup
         packV: d.packVoltage,
         current: d.current,
         soc: d.soc,
@@ -617,7 +653,146 @@ const BMSAnalyzer = () => {
     return markers;
   }, [chartData]);
 
+  // Anomaly summary - aggregates anomalies by type with date ranges
+  const anomalySummary = useMemo(() => {
+    if (!anomalies.length) return null;
+
+    const byType = {};
+    let globalStart = null;
+    let globalEnd = null;
+
+    anomalies.forEach(a => {
+      const type = a.type;
+      if (!byType[type]) {
+        byType[type] = { count: 0, earliest: null, latest: null };
+      }
+      byType[type].count++;
+
+      const aTime = a.time?.getTime ? a.time : new Date(a.time);
+      if (!byType[type].earliest || aTime < byType[type].earliest) {
+        byType[type].earliest = aTime;
+      }
+      if (!byType[type].latest || aTime > byType[type].latest) {
+        byType[type].latest = aTime;
+      }
+
+      if (!globalStart || aTime < globalStart) globalStart = aTime;
+      if (!globalEnd || aTime > globalEnd) globalEnd = aTime;
+    });
+
+    return { byType, globalStart, globalEnd, total: anomalies.length };
+  }, [anomalies]);
+
+  // Fault markers for charts - vertical lines at fault start/end
+  const faultMarkers = useMemo(() => {
+    if (!faultEvents.length || !chartData.length) return [];
+
+    const markers = [];
+
+    // Use pre-computed ts values from chartData (avoid repeated Date parsing)
+    const chartStartTs = chartData[0]?.ts;
+    const chartEndTs = chartData[chartData.length - 1]?.ts;
+
+    if (!chartStartTs || !chartEndTs) return [];
+
+    // Binary search helper to find closest index
+    const findClosestIndex = (targetTs) => {
+      let left = 0;
+      let right = chartData.length - 1;
+
+      while (left < right) {
+        const mid = Math.floor((left + right) / 2);
+        if (chartData[mid].ts < targetTs) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
+      }
+
+      // Check neighbors to find closest
+      const idx = left;
+      if (idx === 0) return 0;
+      if (idx >= chartData.length) return chartData.length - 1;
+
+      const diffLeft = Math.abs(chartData[idx - 1].ts - targetTs);
+      const diffRight = Math.abs(chartData[idx].ts - targetTs);
+      return diffLeft < diffRight ? idx - 1 : idx;
+    };
+
+    faultEvents.forEach(f => {
+      const startTs = f.time?.getTime ? f.time.getTime() : new Date(f.time).getTime();
+
+      // Find chart data point closest to fault start
+      if (startTs >= chartStartTs && startTs <= chartEndTs) {
+        const closestIdx = findClosestIndex(startTs);
+        const closestDiff = Math.abs(chartData[closestIdx].ts - startTs);
+
+        if (closestDiff < 120000) { // Within 2 minutes
+          markers.push({
+            time: chartData[closestIdx].time,
+            type: 'start',
+            code: f.code,
+            name: f.name,
+            stickingRelays: f.stickingRelays || [],
+            severity: f.severity,
+            color: f.severity === 3 ? '#ef4444' : f.severity === 2 ? '#f97316' : '#f59e0b'
+          });
+        }
+      }
+
+      // Find chart data point closest to fault end
+      if (f.endTime && !f.ongoing) {
+        const endTs = f.endTime?.getTime ? f.endTime.getTime() : new Date(f.endTime).getTime();
+
+        if (endTs >= chartStartTs && endTs <= chartEndTs) {
+          const closestIdx = findClosestIndex(endTs);
+          const closestDiff = Math.abs(chartData[closestIdx].ts - endTs);
+
+          if (closestDiff < 120000) {
+            markers.push({
+              time: chartData[closestIdx].time,
+              type: 'end',
+              code: f.code,
+              name: f.name,
+              stickingRelays: f.stickingRelays || [],
+              severity: f.severity,
+              color: f.severity === 3 ? '#ef4444' : f.severity === 2 ? '#f97316' : '#f59e0b'
+            });
+          }
+        }
+      }
+    });
+
+    return markers;
+  }, [faultEvents, chartData]);
+
   const currentSnap = filteredData[playbackIdx] || null;
+  const currentSnapTs = currentSnap?.ts;
+
+  // Snapshot faults - categorized by active/pending/historical based on playback time
+  const snapshotFaults = useMemo(() => {
+    if (!currentSnapTs || !faultEvents.length) return { current: [], pending: [], historical: [] };
+
+    const current = [];
+    const pending = [];
+    const historical = [];
+
+    for (let i = 0; i < faultEvents.length; i++) {
+      const f = faultEvents[i];
+      const startTs = f.time?.getTime ? f.time.getTime() : new Date(f.time).getTime();
+      const endTs = f.endTime ? (f.endTime?.getTime ? f.endTime.getTime() : new Date(f.endTime).getTime()) : (f.ongoing ? Infinity : startTs);
+
+      if (startTs <= currentSnapTs && currentSnapTs <= endTs) {
+        current.push(f);
+      } else if (startTs > currentSnapTs) {
+        pending.push(f);
+      } else if (endTs < currentSnapTs) {
+        historical.push(f);
+      }
+    }
+
+    return { current, pending, historical };
+  }, [currentSnapTs, faultEvents]);
 
   // Guard playbackIdx bounds when filteredData changes (e.g., date filter)
   useEffect(() => {
@@ -666,6 +841,7 @@ const BMSAnalyzer = () => {
     setRawSheetNames([]);
     setFileName('');
     setActiveTab('overview');
+    setHas12VAux(false);
   };
 
   // ---------------------------------------------------------------------------
@@ -701,6 +877,9 @@ const BMSAnalyzer = () => {
               </div>
               <h1 className="text-2xl font-bold text-white mb-3">Battery Management System Analyzer</h1>
               <p className="text-slate-400 mb-6">Drop your Excel file or click to browse</p>
+              <div className="text-xs text-slate-500 mb-6">
+                Max file size: {MAX_FILE_SIZE_MB} MB. Files over {WARN_FILE_SIZE_MB} MB show a performance warning.
+              </div>
               <div className="flex justify-center gap-6 text-sm text-slate-500">
                 <span className="flex items-center gap-1"><Zap className="w-4 h-4 text-cyan-400" /> Voltages</span>
                 <span className="flex items-center gap-1"><ThermometerSun className="w-4 h-4 text-orange-400" /> Temps</span>
@@ -726,7 +905,7 @@ const BMSAnalyzer = () => {
             <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
             <div className="border-l border-slate-700 pl-4">
               <h1 className="text-lg font-semibold">{fileName}</h1>
-              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.1</p>
+              <p className="text-sm text-slate-500">{stats?.samples} samples • {fmtDuration(stats?.duration)} • v1.2</p>
             </div>
           </div>
 
@@ -937,43 +1116,95 @@ const BMSAnalyzer = () => {
               </div>
             )}
 
-            {/* Fault/Anomaly Summary - Condensed */}
+            {/* Issues & Anomaly Summary - Full Width at Bottom */}
             {(faultEvents.length > 0 || anomalies.length > 0) && (
-              <div className="max-w-3xl">
-                <div className="bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Issues Summary - Takes 2 columns */}
+                <div className="lg:col-span-2 bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
                   <div className="p-5 border-b border-slate-800 flex justify-between items-center">
-                    <span className="text-base font-semibold flex items-center gap-2">
-                      <ShieldAlert className="w-5 h-5 text-red-400" /> Issues Summary
+                    <span className="text-lg font-semibold flex items-center gap-2">
+                      <ShieldAlert className="w-6 h-6 text-red-400" /> Issues Summary
                     </span>
                     <button onClick={() => setActiveTab('faults')} className="text-sm text-emerald-400 hover:underline font-medium">
                       View All →
                     </button>
                   </div>
-                  <div className="divide-y divide-slate-800 max-h-80 overflow-y-auto">
-                    {anomalies.slice(0, 5).map((a, i) => (
+                  <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
+                    {anomalies.slice(0, 8).map((a, i) => (
                       <div key={`a-${i}`} className="p-4 flex items-center gap-4 hover:bg-slate-800/30 cursor-pointer transition-colors" onClick={() => jumpToAnomaly(a)}>
-                        <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                        <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm text-red-400 truncate">{a.description}</div>
-                          <div className="text-xs text-slate-500">{a.timeStr.split(',')[1]} • {a.cells.length} cells</div>
+                          <div className="font-medium text-base text-red-400 truncate">{a.description}</div>
+                          <div className="text-sm text-slate-500">{a.timeStr} • {a.cells?.length || 0} cells</div>
                         </div>
-                        <Eye className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                        <Eye className="w-5 h-5 text-slate-500 flex-shrink-0" />
                       </div>
                     ))}
-                    {faultEvents.slice(0, 5).map(f => (
+                    {faultEvents.slice(0, 8).map(f => (
                       <div key={f.id} className="p-4 flex items-center gap-4 hover:bg-slate-800/30 transition-colors">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${f.severity === 3 ? 'bg-red-500' : f.severity === 2 ? 'bg-orange-500' : 'bg-amber-500'}`} />
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 ${f.severity === 3 ? 'bg-red-500' : f.severity === 2 ? 'bg-orange-500' : 'bg-amber-500'}`} />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{f.name}</div>
-                          <div className="text-xs text-slate-500">{f.timeStr.split(',')[1]}</div>
+                          <div className="font-medium text-base truncate">{getEnhancedFaultName(f)}</div>
+                          <div className="text-sm text-slate-500">{f.timeStr}</div>
                         </div>
-                        <span className={`text-xs px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 ${
+                        <span className={`text-sm px-3 py-1.5 rounded-full whitespace-nowrap flex-shrink-0 ${
                           f.severity === 3 ? 'bg-red-500/20 text-red-400' : f.severity === 2 ? 'bg-orange-500/20 text-orange-400' : 'bg-amber-500/20 text-amber-400'
                         }`}>{f.severityText}</span>
                       </div>
                     ))}
                   </div>
                 </div>
+
+                {/* Anomaly Summary - Takes 1 column */}
+                {anomalySummary && (
+                  <div className="bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
+                    <div className="p-5 border-b border-slate-800">
+                      <span className="text-lg font-semibold flex items-center gap-2">
+                        <AlertTriangle className="w-6 h-6 text-orange-400" /> Anomaly Summary
+                      </span>
+                    </div>
+                    <div className="p-5 space-y-4">
+                      {/* Date Range */}
+                      <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">Start:</span>
+                          <span className="font-mono text-white">
+                            {anomalySummary.globalStart?.toLocaleString('en-US', {
+                              month: '2-digit', day: '2-digit', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                            }) || '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">End:</span>
+                          <span className="font-mono text-white">
+                            {anomalySummary.globalEnd?.toLocaleString('en-US', {
+                              month: '2-digit', day: '2-digit', year: 'numeric',
+                              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                            }) || '—'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t border-slate-700">
+                          <span className="text-slate-400">Total Anomalies:</span>
+                          <span className="font-bold text-orange-400 text-xl">{anomalySummary.total}</span>
+                        </div>
+                      </div>
+
+                      {/* By Type Summary */}
+                      <div className="space-y-2">
+                        <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">By Type</div>
+                        {Object.entries(anomalySummary.byType).map(([type, data]) => (
+                          <div key={type} className="flex items-center justify-between bg-slate-800/30 rounded-lg px-4 py-3">
+                            <span className="text-sm capitalize text-slate-300">
+                              {type.replace(/_/g, ' ')}
+                            </span>
+                            <span className="font-bold text-orange-400 text-lg">{data.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -1106,16 +1337,18 @@ const BMSAnalyzer = () => {
               </div>
             </div>
 
-            <PackSocChart data={zoomedChartData} dateChangeMarkers={dateChangeMarkers} />
+            <PackSocChart data={zoomedChartData} dateChangeMarkers={dateChangeMarkers} faultMarkers={faultMarkers} relayConfig={relayConfig} />
 
             <CellVoltageChart
               data={zoomedCellChartData}
               cellCount={stats?.cellCount}
               cellIndexStart={cellIndexRange?.min ?? 0}
               dateChangeMarkers={dateChangeMarkers}
+              faultMarkers={faultMarkers}
+              relayConfig={relayConfig}
             />
 
-            <CellImbalanceChart data={zoomedChartData} faultEvents={faultEvents} />
+            <CellImbalanceChart data={zoomedChartData} faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} />
           </div>
             )}
           </>
@@ -1225,7 +1458,7 @@ const BMSAnalyzer = () => {
                           <AlertTriangle className={`w-6 h-6 ${f.severity === 3 ? 'text-red-400' : f.severity === 2 ? 'text-orange-400' : 'text-amber-400'}`} />
                         </div>
                         <div className="flex-1">
-                          <div className="text-lg font-bold text-white">{f.name}</div>
+                          <div className="text-lg font-bold text-white">{getEnhancedFaultName(f)}</div>
                           <div className="text-sm text-slate-400 font-mono mt-1">Code: {f.code}</div>
                           {f.ongoing && (
                             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-red-500/20 text-red-400 text-xs rounded-full border border-red-500/30">
@@ -1573,6 +1806,85 @@ const BMSAnalyzer = () => {
                     );
                   })}
                 </div>
+
+                {/* 12V AUX Configuration - Only show for 80V batteries */}
+                {stats?.cellCount >= 24 && stats?.cellCount < 30 && (
+                  <div className="mt-5 p-5 rounded-xl border-2 border-cyan-500/30 bg-slate-900/80 shadow-lg shadow-cyan-500/5">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                          <Zap className="w-5 h-5 text-cyan-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-white">12V AUX System Configuration</h3>
+                          <p className="text-xs text-slate-400">Configure relay mapping for your battery type</p>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-bold uppercase tracking-wider transition-colors ${
+                        has12VAux ? 'text-cyan-400' : 'text-slate-500'
+                      }`}>
+                        {has12VAux ? '12V AUX Enabled' : 'Standard Configuration'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <button
+                        onClick={() => setHas12VAux(false)}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
+                          !has12VAux
+                            ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
+                            : 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
+                        }`}
+                      >
+                        <Settings className="w-7 h-7 mb-2" />
+                        <span className="text-sm font-bold uppercase tracking-tight">Standard</span>
+                        <span className="text-xs mt-1 opacity-70">No 12V AUX</span>
+                      </button>
+                      <button
+                        onClick={() => setHas12VAux(true)}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all duration-200 ${
+                          has12VAux
+                            ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
+                            : 'border-slate-700 bg-transparent text-slate-400 hover:border-slate-500'
+                        }`}
+                      >
+                        <Battery className="w-7 h-7 mb-2" />
+                        <span className="text-sm font-bold uppercase tracking-tight">12V Auxiliary</span>
+                        <span className="text-xs mt-1 opacity-70">Enable AUX Names</span>
+                      </button>
+                    </div>
+
+                    <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        <strong className="text-slate-300">Default:</strong> Standard relay configuration. If your battery has a 12V auxiliary system, select "12V Auxiliary" to show correct relay names and mapping.
+                      </p>
+                      <details className="mt-3 pt-3 border-t border-slate-700">
+                        <summary className="flex items-center gap-1 text-xs font-bold text-cyan-400 uppercase cursor-pointer hover:underline">
+                          <ChevronDown className="w-4 h-4" />
+                          Technical Details
+                        </summary>
+                        <div className="mt-3 p-3 bg-slate-900/50 rounded border border-slate-700">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Relay Mapping Changes</h4>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs font-mono">
+                            <span className="text-slate-500">Relay 3:</span>
+                            <span className="text-slate-300">{has12VAux ? 'Pre-charge Relay' : 'Alarm Relay'}</span>
+                            <span className="text-slate-500">Relay 4:</span>
+                            <span className="text-slate-300">{has12VAux ? 'Negative Relay' : 'Pre-charge Relay'}</span>
+                            <span className="text-slate-500">Relay 5:</span>
+                            <span className="text-slate-300">{has12VAux ? 'DC/DC Relay' : 'Negative Relay'}</span>
+                          </div>
+                        </div>
+                      </details>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-3 p-2.5 rounded bg-amber-500/10 border border-amber-500/20">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                      <p className="text-xs font-medium text-amber-500">
+                        Changes apply instantly to relay names displayed above.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Cell Voltages with Heat Map */}
@@ -1657,6 +1969,89 @@ const BMSAnalyzer = () => {
                   </div>
                 </div>
               )}
+
+              {/* Fault Status - Live during playback */}
+              <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
+                <h3 className="text-base text-slate-300 mb-5 flex items-center gap-2 font-semibold">
+                  <ShieldAlert className="w-5 h-5 text-red-400" /> Fault Status
+                </h3>
+                <div className="space-y-4">
+                  {/* Active Faults */}
+                  <div>
+                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                      Active Faults ({snapshotFaults.current.length})
+                    </div>
+                    {snapshotFaults.current.length > 0 ? (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {snapshotFaults.current.map(f => (
+                          <div key={f.id} className={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                            f.severity === 3 ? 'bg-red-900/40 text-red-300' :
+                            f.severity === 2 ? 'bg-orange-900/40 text-orange-300' :
+                            'bg-amber-900/40 text-amber-300'
+                          }`}>
+                            <div className={`w-2 h-2 rounded-full flex-shrink-0 animate-pulse ${
+                              f.severity === 3 ? 'bg-red-500' :
+                              f.severity === 2 ? 'bg-orange-500' : 'bg-amber-500'
+                            }`} />
+                            <span className="truncate flex-1">{getEnhancedFaultName(f)}</span>
+                            <span className="text-xs opacity-70 flex-shrink-0">L{f.severity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-emerald-400 flex items-center gap-2 py-2">
+                        <CheckCircle className="w-4 h-4" /> No active faults
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pending Faults */}
+                  {snapshotFaults.pending.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                        Upcoming ({snapshotFaults.pending.length})
+                      </div>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {snapshotFaults.pending.slice(0, 5).map(f => (
+                          <div key={f.id} className="flex items-center gap-2 px-3 py-1.5 rounded text-xs bg-slate-800/50 text-slate-400">
+                            <Clock className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate flex-1">{getEnhancedFaultName(f)}</span>
+                            <span className="text-xs flex-shrink-0">{f.timeStr?.split(',')[1]?.trim()}</span>
+                          </div>
+                        ))}
+                        {snapshotFaults.pending.length > 5 && (
+                          <div className="text-xs text-slate-500 px-3 py-1">+{snapshotFaults.pending.length - 5} more</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Historical Faults */}
+                  {snapshotFaults.historical.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                        Historical ({snapshotFaults.historical.length})
+                      </div>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {snapshotFaults.historical.slice(-5).reverse().map(f => (
+                          <div key={f.id} className="flex items-center gap-2 px-3 py-1.5 rounded text-xs bg-slate-800/30 text-slate-500">
+                            <span className="truncate flex-1">{getEnhancedFaultName(f)}</span>
+                            <span className="text-xs flex-shrink-0">{f.duration ? fmtDuration(f.duration) : '—'}</span>
+                          </div>
+                        ))}
+                        {snapshotFaults.historical.length > 5 && (
+                          <div className="text-xs text-slate-500 px-3 py-1">+{snapshotFaults.historical.length - 5} more</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No faults at all */}
+                  {snapshotFaults.current.length === 0 && snapshotFaults.pending.length === 0 && snapshotFaults.historical.length === 0 && (
+                    <div className="text-sm text-slate-500 text-center py-4">No fault events recorded</div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Energy & Charging Info Row */}

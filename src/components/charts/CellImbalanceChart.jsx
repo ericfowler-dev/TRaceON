@@ -14,10 +14,24 @@ const ChartCard = ({ title, icon, children }) => (
   </div>
 );
 
-const CellImbalanceTooltip = ({ active, payload, faultEvents }) => {
+const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [], relayConfig = {} }) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const value = data.cellDiff;
+
+  // Find fault markers at this time point
+  const faultsAtTime = faultMarkers.filter(m => m.time === data.time);
+
+  // Helper to get enhanced fault name with actual relay names
+  const getEnhancedName = (fault) => {
+    if (fault.code === 'RlyFault' && fault.stickingRelays && fault.stickingRelays.length > 0) {
+      const relayNames = fault.stickingRelays
+        .map(relayId => relayConfig[relayId] || relayId)
+        .join(', ');
+      return `Relay Fault (${relayNames} Sticking)`;
+    }
+    return fault.name;
+  };
 
   // Find active faults at this timestamp - with defensive checks
   let activeFaults = [];
@@ -63,13 +77,26 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents }) => {
             {data.systemState || 'Standby'}
           </span>
         </div>
+        {faultsAtTime.length > 0 && (
+          <div className="border-t border-slate-700 pt-2 mt-2">
+            <div className="flex items-center gap-1 text-xs font-semibold mb-1" style={{ color: faultsAtTime[0].color }}>
+              <AlertTriangle className="w-3 h-3" />
+              <span>Fault {faultsAtTime[0].type === 'start' ? 'Started' : 'Ended'}</span>
+            </div>
+            {faultsAtTime.map((f, i) => (
+              <div key={i} className="text-sm" style={{ color: f.color }}>
+                {getEnhancedName(f)} ({f.code})
+              </div>
+            ))}
+          </div>
+        )}
         {activeFaults.length > 0 && (
           <div className="border-t border-slate-700 pt-2 mt-2">
             <div className="text-xs text-red-400 font-semibold mb-1">Active Faults:</div>
             <div className="space-y-0.5">
               {activeFaults.slice(0, 3).map((f, i) => (
                 <div key={i} className="text-xs text-red-300">
-                  • {f.name} (Lvl {f.severity})
+                  • {getEnhancedName(f)} (Lvl {f.severity})
                 </div>
               ))}
               {activeFaults.length > 3 && (
@@ -80,7 +107,7 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents }) => {
             </div>
           </div>
         )}
-        {activeFaults.length === 0 && (
+        {activeFaults.length === 0 && faultsAtTime.length === 0 && (
           <div className="flex items-center gap-2 text-xs text-emerald-400">
             <CheckCircle className="w-3 h-3" />
             <span>No Active Faults</span>
@@ -91,7 +118,7 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents }) => {
   );
 };
 
-const CellImbalanceChart = ({ data, faultEvents = [] }) => {
+const CellImbalanceChart = ({ data, faultEvents = [], faultMarkers = [], relayConfig = {} }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title="Cell Imbalance (Δ) - Balance Health Monitor" icon={<AlertTriangle className="w-4 h-4 text-red-400" />}>
@@ -115,6 +142,17 @@ const CellImbalanceChart = ({ data, faultEvents = [] }) => {
           {/* MARGINAL threshold: 30-150mV (YELLOW) */}
           <ReferenceLine y={150} label={{ position: 'right', value: 'Warning 150mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
 
+          {/* Fault markers - solid line for start, dashed for end */}
+          {faultMarkers.map((marker, idx) => (
+            <ReferenceLine
+              key={`fault-${idx}`}
+              x={marker.time}
+              stroke={marker.color}
+              strokeWidth={2}
+              strokeDasharray={marker.type === 'end' ? '4 4' : 'none'}
+            />
+          ))}
+
           <Tooltip
             shared={true}
             isAnimationActive={false}
@@ -123,7 +161,7 @@ const CellImbalanceChart = ({ data, faultEvents = [] }) => {
             cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
             wrapperStyle={{ zIndex: 1000 }}
             allowEscapeViewBox={{ x: true, y: true }}
-            content={<CellImbalanceTooltip faultEvents={faultEvents} />}
+            content={<CellImbalanceTooltip faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} />}
           />
           {/* Main line */}
           <Line

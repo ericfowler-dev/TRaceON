@@ -91,8 +91,10 @@ export function detectProduct(cellCount, avgPackVoltage) {
 }
 
 // Relay configurations by product type
+// Reference: Log Relay ID to Relay Cross Reference (Section 7.6)
 export const RELAY_CONFIG_BY_PRODUCT = {
-  default: {
+  // 96V230Ah - Standard configuration with Alarm Relay
+  '96V': {
     'Relay0': 'Positive Relay',
     'Relay1': 'Charging Relay',
     'Relay2': 'Heating Relay',
@@ -100,21 +102,23 @@ export const RELAY_CONFIG_BY_PRODUCT = {
     'Relay4': 'Pre-charge Relay',
     'Relay5': 'Negative Relay'
   },
+  // 80V304Ah WITHOUT 12V AUX - Has Alarm Relay, NO DC/DC Relay
   '80V': {
+    'Relay0': 'Positive Relay',
+    'Relay1': 'Charging Relay',
+    'Relay2': 'Heating Relay',
+    'Relay3': 'Alarm Relay',
+    'Relay4': 'Pre-charge Relay',
+    'Relay5': 'Negative Relay'
+  },
+  // 80V304Ah WITH 12V AUX - NO Alarm Relay, HAS DC/DC Relay
+  '80V_12V_AUX': {
     'Relay0': 'Positive Relay',
     'Relay1': 'Charging Relay',
     'Relay2': 'Heating Relay',
     'Relay3': 'Pre-charge Relay',
     'Relay4': 'Negative Relay',
     'Relay5': 'DC/DC Relay'
-  },
-  '96V_ALARM': {
-    'Relay0': 'Positive Relay',
-    'Relay1': 'Charging Relay',
-    'Relay2': 'Heating Relay',
-    'Relay3': 'Alarm Relay',
-    'Relay4': 'Pre-charge Relay',
-    'Relay5': 'Negative Relay'
   }
 };
 
@@ -122,18 +126,22 @@ export const RELAY_NAMES = {
   'Relay0': 'Positive Relay',
   'Relay1': 'Charging Relay',
   'Relay2': 'Heating Relay',
-  'Relay3': 'Alarm Relay / Pre-charge Relay',
-  'Relay4': 'Pre-charge Relay / Negative Relay',
-  'Relay5': 'Negative Relay / DC/DC Relay'
+  'Relay3': 'Alarm Relay',
+  'Relay4': 'Pre-charge Relay',
+  'Relay5': 'Negative Relay'
 };
 
-export function getRelayConfig(deviceInfo, cellCount) {
+// Get relay config based on cell count and optional 12V AUX flag
+export function getRelayConfig(deviceInfo, cellCount, has12VAux = false) {
   if (cellCount >= 30) {
-    return RELAY_CONFIG_BY_PRODUCT['96V_ALARM'];
+    return RELAY_CONFIG_BY_PRODUCT['96V'];
   } else if (cellCount >= 24) {
-    return RELAY_CONFIG_BY_PRODUCT['80V'];
+    // 80V battery - check for 12V AUX option
+    return has12VAux
+      ? RELAY_CONFIG_BY_PRODUCT['80V_12V_AUX']
+      : RELAY_CONFIG_BY_PRODUCT['80V'];
   }
-  return RELAY_CONFIG_BY_PRODUCT.default;
+  return RELAY_CONFIG_BY_PRODUCT['96V']; // Default fallback
 }
 
 export const ALL_RELAYS = ['Relay0', 'Relay1', 'Relay2', 'Relay3', 'Relay4', 'Relay5'];

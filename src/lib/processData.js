@@ -901,16 +901,31 @@ export const processData = (sheets) => {
         if (currentState > 0) {
           const snapshot = findNearestSnapshot(t.getTime());
 
+          // Check for sticking relays to enhance fault name
+          let enhancedName = ALARM_MAPPING[key] || key;
+          let stickingRelays = [];
+          if (snapshot && snapshot.relays) {
+            stickingRelays = Object.entries(snapshot.relays)
+              .filter(([, state]) => state === 'STICKING')
+              .map(([relayId]) => relayId);
+
+            // If this is a relay fault and we found sticking relays, enhance the name
+            if (key === 'RlyFault' && stickingRelays.length > 0) {
+              enhancedName = `Relay Fault (${stickingRelays.join(', ')} Sticking)`;
+            }
+          }
+
           const evt = {
             id: `${key}-${t.getTime()}`,
             code: key,
-            name: ALARM_MAPPING[key] || key,
+            name: enhancedName,
             severity: currentState,
             severityText: trimVal,
             eventType: 'SET',
             time: t,
             timeStr: t.toLocaleString(),
             snapshot: { ...snapshot },
+            stickingRelays, // Store sticking relays for reference
             stats: null // Will be calculated when fault ends
           };
           faults.push(evt);

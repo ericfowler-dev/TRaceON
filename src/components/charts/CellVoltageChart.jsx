@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine
 } from 'recharts';
-import { Activity } from 'lucide-react';
+import { Activity, AlertTriangle } from 'lucide-react';
 import { iterativeMergeSort } from '../../lib/parsers';
 
 const ChartCard = ({ title, icon, children }) => (
@@ -15,9 +15,23 @@ const ChartCard = ({ title, icon, children }) => (
   </div>
 );
 
-const CellVoltageTooltip = ({ active, payload, cellCount, cellIndexStart = 0 }) => {
+const CellVoltageTooltip = ({ active, payload, cellCount, cellIndexStart = 0, faultMarkers = [], relayConfig = {} }) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
+
+  // Find faults at this time point
+  const faultsAtTime = faultMarkers.filter(m => m.time === data.time);
+
+  // Helper to get enhanced fault name with actual relay names
+  const getEnhancedName = (fault) => {
+    if (fault.code === 'RlyFault' && fault.stickingRelays && fault.stickingRelays.length > 0) {
+      const relayNames = fault.stickingRelays
+        .map(relayId => relayConfig[relayId] || relayId)
+        .join(', ');
+      return `Relay Fault (${relayNames} Sticking)`;
+    }
+    return fault.name;
+  };
 
   const cellVoltages = [];
   if (cellCount && cellCount > 0) {
@@ -65,6 +79,20 @@ const CellVoltageTooltip = ({ active, payload, cellCount, cellIndexStart = 0 }) 
           <span className="text-blue-400 font-bold">{data.minCell}mV</span>
         </div>
 
+        {faultsAtTime.length > 0 && (
+          <div className="border-t border-slate-700 pt-2 mt-2">
+            <div className="flex items-center gap-1 text-xs font-semibold mb-1" style={{ color: faultsAtTime[0].color }}>
+              <AlertTriangle className="w-3 h-3" />
+              <span>Fault {faultsAtTime[0].type === 'start' ? 'Started' : 'Ended'}</span>
+            </div>
+            {faultsAtTime.map((f, i) => (
+              <div key={i} className="text-sm" style={{ color: f.color }}>
+                {getEnhancedName(f)} ({f.code})
+              </div>
+            ))}
+          </div>
+        )}
+
         {sortedCellVoltages.length > 10 ? (
           <>
             <div className="text-xs text-slate-500 mt-2 mb-1">Highest 5 Cells:</div>
@@ -101,7 +129,7 @@ const CellVoltageTooltip = ({ active, payload, cellCount, cellIndexStart = 0 }) 
   );
 };
 
-const CellVoltageChart = ({ data, cellCount, cellIndexStart = 0, dateChangeMarkers = [] }) => {
+const CellVoltageChart = ({ data, cellCount, cellIndexStart = 0, dateChangeMarkers = [], faultMarkers = [], relayConfig = {} }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title={`Cell Voltage Precision (${cellCount || 0} cells)`} icon={<Activity className="w-4 h-4 text-cyan-400" />}>
@@ -167,6 +195,17 @@ const CellVoltageChart = ({ data, cellCount, cellIndexStart = 0, dateChangeMarke
             />
           ))}
 
+          {/* Fault markers - solid line for start, dashed for end */}
+          {faultMarkers.map((marker, idx) => (
+            <ReferenceLine
+              key={`fault-${idx}`}
+              x={marker.time}
+              stroke={marker.color}
+              strokeWidth={2}
+              strokeDasharray={marker.type === 'end' ? '4 4' : 'none'}
+            />
+          ))}
+
           <Tooltip
             shared={true}
             isAnimationActive={false}
@@ -174,7 +213,7 @@ const CellVoltageChart = ({ data, cellCount, cellIndexStart = 0, dateChangeMarke
             allowEscapeViewBox={{ x: true, y: true }}
             cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
             wrapperStyle={{ zIndex: 1000 }}
-            content={<CellVoltageTooltip cellCount={cellCount} cellIndexStart={cellIndexStart} />}
+            content={<CellVoltageTooltip cellCount={cellCount} cellIndexStart={cellIndexStart} faultMarkers={faultMarkers} relayConfig={relayConfig} />}
           />
 
           <Line

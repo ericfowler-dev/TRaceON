@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Data files
+*.xlsx
+*.csv
+*.json.gz
+
+# Analysis scripts
+analyze*.py
+analyze*.js
+compare*.js
+test-*.js
+
+# Output files
+*_output.txt
+*_fixlist.txt
+
+# Trace files
+Trace-*.json*
+*_Trace.json
