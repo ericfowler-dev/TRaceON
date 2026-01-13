@@ -62,6 +62,10 @@ export const formatInsulation = (val) => {
   return `${val.toFixed(2)} kΩ`;
 };
 
+// Safe min/max for large arrays - avoids stack overflow from Math.min(...arr) spread operator
+export const arrMin = (arr) => { let m = arr[0]; for (let i = 1; i < arr.length; i++) if (arr[i] < m) m = arr[i]; return m; };
+export const arrMax = (arr) => { let m = arr[0]; for (let i = 1; i < arr.length; i++) if (arr[i] > m) m = arr[i]; return m; };
+
 // Iterative (non-recursive) merge sort to avoid stack overflow on large arrays
 // JavaScript's Array.sort() uses recursive algorithms that fail on 10,000+ elements
 export const iterativeMergeSort = (arr, compareFn) => {

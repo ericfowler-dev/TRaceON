@@ -18,7 +18,7 @@ import {
 } from './lib/thresholds';
 import {
   fmt, fmtTime, fmtDuration, formatInsulation,
-  iterativeMergeSort, getVoltageHeatMap
+  iterativeMergeSort, getVoltageHeatMap, arrMin, arrMax
 } from './lib/parsers';
 
 // Import extracted chart components
@@ -362,30 +362,30 @@ const BMSAnalyzer = () => {
       balancingCells: balancingCells.size,
       energy: energyStats,
       packV: packVs.length ? {
-        min: Math.min(...packVs), max: Math.max(...packVs),
+        min: arrMin(packVs), max: arrMax(packVs),
         avg: packVs.reduce((a, b) => a + b, 0) / packVs.length,
         current: last.packVoltage
       } : null,
       current: currents.length ? {
-        min: Math.min(...currents), max: Math.max(...currents),
+        min: arrMin(currents), max: arrMax(currents),
         avg: currents.reduce((a, b) => a + b, 0) / currents.length,
         current: last.current
       } : null,
       cellV: validCellMaxs.length ? {
-        min: Math.min(...validCellMins), max: Math.max(...validCellMaxs),
-        maxDiff: cellDiffs.length ? Math.max(...cellDiffs) : null
+        min: validCellMins.length ? arrMin(validCellMins) : null, max: arrMax(validCellMaxs),
+        maxDiff: cellDiffs.length ? arrMax(cellDiffs) : null
       } : null,
       temp: tempMaxs.length ? {
-        min: Math.min(...tempMins), max: Math.max(...tempMaxs),
-        maxDiff: tempDiffs.length ? Math.max(...tempDiffs) : null
+        min: tempMins.length ? arrMin(tempMins) : null, max: arrMax(tempMaxs),
+        maxDiff: tempDiffs.length ? arrMax(tempDiffs) : null
       } : null,
       soc: socs.length ? {
         start: socs[0], end: socs[socs.length - 1],
-        min: Math.min(...socs), max: Math.max(...socs)
+        min: arrMin(socs), max: arrMax(socs)
       } : null,
-      soh: sohs.length ? { current: last.soh, min: Math.min(...sohs), max: Math.max(...sohs) } : null,
+      soh: sohs.length ? { current: last.soh, min: arrMin(sohs), max: arrMax(sohs) } : null,
       insulation: insulations.length ? {
-        min: Math.min(...insulations), max: Math.max(...insulations),
+        min: arrMin(insulations), max: arrMax(insulations),
         current: last.insulationRes
       } : { current: last.insulationRes },
       faults: {
@@ -2077,8 +2077,8 @@ const BMSAnalyzer = () => {
                     // Filter out corrupt sensor readings (>5000mV or <1000mV)
                     const validCells = cells.filter(([, v]) => v > 1000 && v < 5000);
                     const voltages = validCells.map(([, v]) => v);
-                    const minV = voltages.length > 0 ? Math.min(...voltages) : 0;
-                    const maxV = voltages.length > 0 ? Math.max(...voltages) : 0;
+                    const minV = voltages.length > 0 ? arrMin(voltages) : 0;
+                    const maxV = voltages.length > 0 ? arrMax(voltages) : 0;
                     const avgV = voltages.length > 0 ? voltages.reduce((a, b) => a + b, 0) / voltages.length : 0;
 
                     return validCells.map(([k, v]) => {

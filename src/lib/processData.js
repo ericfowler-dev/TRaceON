@@ -944,33 +944,25 @@ export const processData = (sheets) => {
             const posInsulations = faultData.map(d => d.posInsulation).filter(v => v != null);
             const negInsulations = faultData.map(d => d.negInsulation).filter(v => v != null);
 
-            prevState.event.stats = {
-              cellV: cellVoltages.length ? {
-                min: Math.min(...cellVoltages),
-                max: Math.max(...cellVoltages),
-                avg: cellVoltages.reduce((a, b) => a + b, 0) / cellVoltages.length
-              } : null,
-              temp: temps.length ? {
-                min: Math.min(...temps),
-                max: Math.max(...temps),
-                avg: temps.reduce((a, b) => a + b, 0) / temps.length
-              } : null,
-              insulation: insulations.length ? {
-                min: Math.min(...insulations),
-                max: Math.max(...insulations),
-                avg: insulations.reduce((a, b) => a + b, 0) / insulations.length
-              } : null,
-              posInsulation: posInsulations.length ? {
-                min: Math.min(...posInsulations),
-                max: Math.max(...posInsulations),
-                avg: posInsulations.reduce((a, b) => a + b, 0) / posInsulations.length
-              } : null,
-              negInsulation: negInsulations.length ? {
-                min: Math.min(...negInsulations),
-                max: Math.max(...negInsulations),
-                avg: negInsulations.reduce((a, b) => a + b, 0) / negInsulations.length
-              } : null
-            };
+            // Helper to compute min/max/avg without spread operator (avoids stack overflow)
+          const computeStats = (arr) => {
+            if (!arr.length) return null;
+            let min = arr[0], max = arr[0], sum = 0;
+            for (let i = 0; i < arr.length; i++) {
+              if (arr[i] < min) min = arr[i];
+              if (arr[i] > max) max = arr[i];
+              sum += arr[i];
+            }
+            return { min, max, avg: sum / arr.length };
+          };
+
+          prevState.event.stats = {
+            cellV: computeStats(cellVoltages),
+            temp: computeStats(temps),
+            insulation: computeStats(insulations),
+            posInsulation: computeStats(posInsulations),
+            negInsulation: computeStats(negInsulations)
+          };
           }
 
           activeFaultState.set(key, { severity: 0 });
