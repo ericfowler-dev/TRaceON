@@ -8,8 +8,10 @@ import {
   ThermometerSun, Battery, Activity, Gauge, Cpu, CheckCircle,
   ShieldAlert, Calendar, ChevronDown, ChevronRight, Table, X,
   Play, Pause, SkipBack, SkipForward, Camera, TrendingUp, Info,
-  Search, Flag, Eye, Settings
+  Search, Flag, Eye, Settings, Download
 } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 
 // Import from extracted modules
 import {
@@ -156,7 +158,9 @@ const BMSAnalyzer = () => {
   const [showAllRows, setShowAllRows] = useState({});
   const [searchTime, setSearchTime] = useState('');
   const [has12VAux, setHas12VAux] = useState(false); // 80V battery 12V AUX option
+  const [isExporting, setIsExporting] = useState(false);
   const workerRef = useRef(null);
+  const reportRef = useRef(null);
 
   useEffect(() => {
     if (PERF) console.log(`[perf] tab change: ${activeTab}`);
@@ -857,6 +861,98 @@ const BMSAnalyzer = () => {
   };
 
   // ---------------------------------------------------------------------------
+  // PDF EXPORT
+  // ---------------------------------------------------------------------------
+  const exportToPDF = async () => {
+    if (!reportRef.current || isExporting) return;
+
+    setIsExporting(true);
+    try {
+      const element = reportRef.current;
+
+      // Create PNG from the report container using html-to-image
+      const imgData = await toPng(element, {
+        pixelRatio: 2, // Higher resolution
+        backgroundColor: '#020617', // slate-950
+        width: element.scrollWidth,
+        height: element.scrollHeight
+      });
+
+      // Load image to get dimensions
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imgData;
+      });
+
+      const imgWidth = img.width;
+      const imgHeight = img.height;
+
+      // Calculate PDF dimensions (A4 landscape for better fit)
+      const pdf = new jsPDF({
+        orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+
+      // Scale image to fit PDF width with margins
+      const margin = 10;
+      const contentWidth = pdfWidth - (margin * 2);
+      const scaledHeight = (imgHeight * contentWidth) / imgWidth;
+
+      // If content fits on one page, simple add
+      if (scaledHeight <= pdfHeight - (margin * 2)) {
+        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
+      } else {
+        // Multi-page: create canvas and slice
+        const canvas = document.createElement('canvas');
+        canvas.width = imgWidth;
+        canvas.height = imgHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        let remainingHeight = scaledHeight;
+
+        while (remainingHeight > 0) {
+          const pageContentHeight = Math.min(remainingHeight, pdfHeight - (margin * 2));
+          const sourceY = (scaledHeight - remainingHeight) * (imgHeight / scaledHeight);
+          const sourceHeight = pageContentHeight * (imgHeight / scaledHeight);
+
+          const pageCanvas = document.createElement('canvas');
+          pageCanvas.width = imgWidth;
+          pageCanvas.height = sourceHeight;
+          const pageCtx = pageCanvas.getContext('2d');
+          pageCtx.drawImage(canvas, 0, sourceY, imgWidth, sourceHeight, 0, 0, imgWidth, sourceHeight);
+
+          const pageImgData = pageCanvas.toDataURL('image/png');
+          pdf.addImage(pageImgData, 'PNG', margin, margin, contentWidth, pageContentHeight);
+
+          remainingHeight -= pageContentHeight;
+
+          if (remainingHeight > 0) {
+            pdf.addPage();
+          }
+        }
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const baseName = fileName ? fileName.replace(/\.xlsx?$/i, '') : 'bms-report';
+      pdf.save(`${baseName}-${activeTab}-${timestamp}.pdf`);
+
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('Failed to export PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // RENDER: UPLOAD SCREEN
   // ---------------------------------------------------------------------------
   if (!timeSeries.length) {
@@ -909,147 +1005,137 @@ const BMSAnalyzer = () => {
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      {/* Navigation Bar - Pill Buttons */}
-      <nav className="flex items-center justify-between mx-4 mt-4 mb-4 bg-[#0a0f1d] border border-slate-700 p-2 rounded-lg">
-        {/* Left Side - Logo & Title */}
-        <div className="flex items-center gap-4 pl-2">
-          {/* TRaceON Logo with Version */}
-          <div className="flex items-center gap-3">
-            <img src="traceon-logo.png" alt="TRaceON" className="h-9" />
-            <div className="flex flex-col">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-tight">BMS Analyzer</span>
-              <span className="text-[10px] text-slate-600">v1.3.1</span>
+      {/* Navigation Bar - Tron Style */}
+      <header className="bg-[#020617] border-b border-cyan-500/20 shadow-[0_1px_20px_rgba(0,242,255,0.1)]">
+        <div className="max-w-[1920px] mx-auto flex flex-col lg:flex-row items-center justify-between px-6 py-4 gap-4">
+          {/* Left: Logo and Data Stream */}
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="relative flex items-center justify-center">
+                <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(57,255,20,0.8)]"></div>
+              </div>
+              <div className="flex flex-col">
+                <span className="console-font text-[10px] font-bold text-cyan-500/70 uppercase tracking-widest">BMS Analyzer</span>
+                <span className="text-[10px] text-slate-600">v1.3.2</span>
+              </div>
             </div>
+            {fileName && (
+              <>
+                <div className="tron-separator hidden xl:block"></div>
+                <div className="hidden xl:flex flex-col">
+                  <span className="text-[9px] uppercase text-cyan-500/70 font-bold tracking-widest mb-1">Data Stream</span>
+                  <span className="text-[11px] text-slate-400 digital-font bg-black/60 px-2 py-0.5 border border-cyan-500/20 rounded shadow-[inset_0_0_10px_rgba(0,242,255,0.05)]">{fileName}</span>
+                </div>
+              </>
+            )}
           </div>
-          {fileName && (
-            <>
-              <div className="h-8 w-px bg-slate-700" />
-              <span className="text-sm text-slate-400">{fileName}</span>
-            </>
-          )}
-        </div>
 
-        {/* Right Side - Navigation Pills */}
-        <div className="flex items-center gap-2">
-          {/* Date Filter - if multiple dates */}
-          {availableDates.length > 1 && (
-            <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-full px-3 py-1.5 mr-2">
-              <Calendar className="w-4 h-4 text-cyan-400" />
-              <select
-                id="date-filter"
-                name="dateFilter"
-                className="bg-transparent border-none text-sm font-medium cursor-pointer focus:outline-none"
-                value={selectedDate}
-                onChange={(e) => dispatch({ type: 'SET_DATE', payload: e.target.value })}
+          {/* Center: Navigation */}
+          <nav className="flex items-center">
+            <div className="flex items-center gap-2">
+              {/* Date Filter - if multiple dates */}
+              {availableDates.length > 1 && (
+                <div className="nav-tab flex items-center gap-2 h-10 px-4 mr-2">
+                  <Calendar className="w-4 h-4 text-cyan-400/70" />
+                  <select
+                    id="date-filter"
+                    name="dateFilter"
+                    className="bg-transparent border-none text-[10px] console-font font-bold uppercase cursor-pointer focus:outline-none text-slate-400"
+                    value={selectedDate}
+                    onChange={(e) => dispatch({ type: 'SET_DATE', payload: e.target.value })}
+                  >
+                    <option value="all">All Dates ({timeSeries.length})</option>
+                    {availableDates.map(d => {
+                      const count = timeSeries.filter(t => t.dateKey === d).length;
+                      return <option key={d} value={d}>{d} ({count})</option>;
+                    })}
+                  </select>
+                </div>
+              )}
+
+              {/* Overview */}
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`nav-tab flex items-center h-10 px-6 cursor-pointer ${activeTab === 'overview' ? 'nav-tab-active' : 'text-slate-400'}`}
               >
-                <option value="all">All Dates ({timeSeries.length})</option>
-                {availableDates.map(d => {
-                  const count = timeSeries.filter(t => t.dateKey === d).length;
-                  return <option key={d} value={d}>{d} ({count})</option>;
-                })}
-              </select>
+                <span className="console-font text-[10px] font-bold uppercase">Overview</span>
+              </button>
+
+              {/* Charts */}
+              <button
+                onClick={() => setActiveTab('charts')}
+                className={`nav-tab flex items-center h-10 px-6 cursor-pointer ${activeTab === 'charts' ? 'nav-tab-active' : 'text-slate-400'}`}
+              >
+                <span className="console-font text-[10px] font-bold uppercase">Charts</span>
+              </button>
+
+              {/* Anomalies & Faults (same tab) */}
+              <button
+                onClick={() => setActiveTab('faults')}
+                className={`nav-tab flex items-center gap-2 h-10 px-6 cursor-pointer ${activeTab === 'faults' ? 'nav-tab-active' : 'text-slate-400'}`}
+              >
+                <span className="console-font text-[10px] font-bold uppercase">Anomalies</span>
+                {stats?.anomalies > 0 && (
+                  <span className="digital-display-minimal digital-font">{stats.anomalies}</span>
+                )}
+              </button>
+
+              {/* Faults */}
+              <button
+                onClick={() => setActiveTab('faults')}
+                className={`nav-tab flex items-center gap-2 h-10 px-6 cursor-pointer ${activeTab === 'faults' ? 'nav-tab-active' : 'text-slate-400'}`}
+              >
+                <span className="console-font text-[10px] font-bold uppercase">Faults</span>
+                {stats?.faults?.total > 0 && (
+                  <span className="digital-display-minimal digital-font">{String(stats.faults.total).padStart(2, '0')}</span>
+                )}
+              </button>
+
+              {/* Snapshot */}
+              <button
+                onClick={() => setActiveTab('snapshot')}
+                className={`nav-tab flex items-center h-10 px-6 cursor-pointer ${activeTab === 'snapshot' ? 'nav-tab-active' : 'text-slate-400'}`}
+              >
+                <span className="console-font text-[10px] font-bold uppercase">Snapshot</span>
+              </button>
             </div>
-          )}
+          </nav>
 
-          {/* Overview */}
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'overview'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Overview
-          </button>
+          {/* Right: Action Buttons */}
+          <div className="flex items-center gap-2">
+            {/* Export PDF Button */}
+            <button
+              onClick={exportToPDF}
+              disabled={isExporting}
+              className="tron-btn flex items-center gap-2 h-10 px-5 cursor-pointer text-slate-400"
+            >
+              {isExporting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-cyan-400/70 border-t-transparent rounded-full animate-spin" />
+                  <span className="console-font text-[10px] font-bold uppercase">Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-sm text-cyan-400/70">picture_as_pdf</span>
+                  <span className="console-font text-[10px] font-bold uppercase">Export PDF</span>
+                </>
+              )}
+            </button>
 
-          {/* Charts */}
-          <button
-            onClick={() => setActiveTab('charts')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'charts'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Charts
-          </button>
-
-          {/* Anomalies */}
-          <button
-            onClick={() => setActiveTab('faults')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'faults'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <span>Anomalies</span>
-            {stats?.anomalies > 0 && (
-              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded ml-2 font-bold inline-flex items-center justify-center min-w-[20px] h-[20px]">
-                {stats.anomalies}
-              </span>
-            )}
-          </button>
-
-          {/* Faults */}
-          <button
-            onClick={() => setActiveTab('faults')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'faults'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            <span>Faults</span>
-            {stats?.faults?.total > 0 && (
-              <span className={`text-white text-xs px-2 py-0.5 rounded ml-2 font-bold inline-flex items-center justify-center min-w-[20px] h-[20px] ${
-                stats.faults.l3 > 0 ? 'bg-red-500' : 'bg-orange-500'
-              }`}>
-                {stats.faults.total}
-              </span>
-            )}
-          </button>
-
-          {/* Snapshot */}
-          <button
-            onClick={() => setActiveTab('snapshot')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'snapshot'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Snapshot
-          </button>
-
-          {/* Raw */}
-          <button
-            onClick={() => setActiveTab('raw')}
-            className={`px-6 py-2.5 rounded-full text-base font-medium transition-all duration-200 flex items-center gap-2 ${
-              activeTab === 'raw'
-                ? 'bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]'
-                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-            }`}
-          >
-            Raw
-          </button>
-
-          {/* Spacer */}
-          <div className="w-4" />
-
-          {/* Upload New BMS Log Button */}
-          <button
-            onClick={reset}
-            className="px-6 py-2.5 rounded-full text-base font-bold bg-emerald-500 text-white hover:bg-green-500 transition-colors flex items-center gap-2"
-          >
-            <Upload className="w-5 h-5" />
-            Upload new BMS Log
-          </button>
+            {/* Upload BMS Log Button */}
+            <button
+              onClick={reset}
+              className="tron-btn flex items-center gap-2 h-10 px-5 cursor-pointer text-slate-400"
+            >
+              <span className="material-symbols-outlined text-sm text-cyan-400/70">upload_file</span>
+              <span className="console-font text-[10px] font-bold uppercase">Upload BMS Log</span>
+            </button>
+          </div>
         </div>
-      </nav>
+      </header>
 
-      <main className="w-full px-6 py-6 space-y-8 mx-auto" style={{ maxWidth: '98%' }}>
+      <main ref={reportRef} className="w-full px-6 py-6 space-y-8 mx-auto" style={{ maxWidth: '98%' }}>
 
         {/* ==================== OVERVIEW ==================== */}
         {activeTab === 'overview' && (stats || timeSeries.length > 0) && (

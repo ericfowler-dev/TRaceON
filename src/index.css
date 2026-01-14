@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+:root {
+  --bg-deep: #020617;
+  --panel-bg: #0a131e;
+  --neon-blue: #00f2ff;
+  --neon-green: #39ff14;
+  --neon-red: #ff3131;
+  --hologram-glow: rgba(0, 242, 255, 0.15);
+  --border-glow: rgba(0, 242, 255, 0.3);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -8,7 +18,148 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-deep);
+  font-family: 'Rajdhani', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: #e2e8f0;
+}
+
+.console-font {
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.1em;
+}
+
+.digital-font {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Tron-style nav tabs */
+.nav-tab {
+  transition: all 0.3s ease;
+  position: relative;
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.08) 0%, transparent 50%);
+  border: 1px solid rgba(0, 242, 255, 0.2);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+/* Diagonal corner accent */
+.nav-tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.6) 0%, rgba(0, 242, 255, 0.2) 50%, transparent 50%);
+  pointer-events: none;
+}
+
+/* Bottom right corner accent */
+.nav-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(315deg, rgba(0, 242, 255, 0.4) 0%, rgba(0, 242, 255, 0.1) 50%, transparent 50%);
+  pointer-events: none;
+}
+
+.nav-tab:hover:not(.nav-tab-active) {
+  color: #fff;
+  border-color: rgba(0, 242, 255, 0.5);
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.15) 0%, rgba(0, 242, 255, 0.03) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.15), inset 0 0 20px rgba(0, 242, 255, 0.05);
+}
+
+.nav-tab:hover:not(.nav-tab-active)::before {
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.9) 0%, rgba(0, 242, 255, 0.4) 50%, transparent 50%);
+}
+
+/* Active state - full Tron glow */
+.nav-tab-active {
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.2) 0%, rgba(0, 242, 255, 0.05) 30%, transparent 100%);
+  border: 1px solid rgba(0, 242, 255, 0.6);
+  color: var(--neon-blue) !important;
+  box-shadow:
+    0 0 25px rgba(0, 242, 255, 0.2),
+    0 0 50px rgba(0, 242, 255, 0.1),
+    inset 0 0 30px rgba(0, 242, 255, 0.08);
+  text-shadow: 0 0 10px rgba(0, 242, 255, 0.8);
+}
+
+.nav-tab-active::before {
+  background: linear-gradient(135deg, var(--neon-blue) 0%, rgba(0, 242, 255, 0.5) 50%, transparent 50%);
+  box-shadow: 0 0 8px var(--neon-blue);
+}
+
+.nav-tab-active::after {
+  background: linear-gradient(315deg, rgba(0, 242, 255, 0.8) 0%, rgba(0, 242, 255, 0.3) 50%, transparent 50%);
+}
+
+/* Digital display for badges */
+.digital-display-minimal {
+  background: #000;
+  border: 1px solid rgba(255, 49, 49, 0.3);
+  color: var(--neon-red);
+  padding: 0px 4px;
+  font-size: 10px;
+}
+
+/* Utility buttons - Tron style */
+.tron-btn {
+  transition: all 0.3s ease;
+  position: relative;
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.05) 0%, transparent 50%);
+  border: 1px solid rgba(0, 242, 255, 0.25);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+.tron-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.5) 0%, rgba(0, 242, 255, 0.2) 50%, transparent 50%);
+  pointer-events: none;
+}
+
+.tron-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(315deg, rgba(0, 242, 255, 0.3) 0%, rgba(0, 242, 255, 0.1) 50%, transparent 50%);
+  pointer-events: none;
+}
+
+.tron-btn:hover {
+  color: #fff;
+  border-color: rgba(0, 242, 255, 0.6);
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.12) 0%, rgba(0, 242, 255, 0.03) 50%, transparent 100%);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.15), inset 0 0 15px rgba(0, 242, 255, 0.05);
+}
+
+.tron-btn:hover::before {
+  background: linear-gradient(135deg, rgba(0, 242, 255, 0.9) 0%, rgba(0, 242, 255, 0.4) 50%, transparent 50%);
+  box-shadow: 0 0 6px var(--neon-blue);
+}
+
+.tron-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Separator line with glow */
+.tron-separator {
+  width: 1px;
+  height: 24px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 242, 255, 0.4) 50%, transparent 100%);
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3);
 }
