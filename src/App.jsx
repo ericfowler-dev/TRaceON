@@ -981,7 +981,7 @@ const BMSAnalyzer = () => {
             <>
               {/* TRaceON Logo */}
               <div className="mb-8">
-                <img src="traceon-logo-psi.png" alt="TRaceON" className="h-24 mx-auto" />
+                <img src={`${import.meta.env.BASE_URL}traceon-logo-psi.png`} alt="TRaceON" className="h-24 mx-auto" />
               </div>
               <h1 className="text-2xl font-bold text-white mb-3">Battery Management System Analyzer</h1>
               <p className="text-slate-400 mb-6">Drop your Excel file or click to browse</p>
@@ -1012,7 +1012,7 @@ const BMSAnalyzer = () => {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
               <div className="relative flex items-center justify-center">
-                <img src="traceon-logo.png" alt="TRaceON" className="h-10" />
+                <img src={`${import.meta.env.BASE_URL}traceon-logo.png`} alt="TRaceON" className="h-10" />
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_8px_rgba(57,255,20,0.8)]"></div>
               </div>
               <div className="flex flex-col">
