@@ -1,5 +1,6 @@
 import {
-  ALARM_MAPPING, SEVERITY_MAP, detectProduct, ALL_RELAYS, THRESHOLDS
+  ALARM_MAPPING, SEVERITY_MAP, detectProduct, ALL_RELAYS, THRESHOLDS,
+  COMPOUND_FAULTS, PRODUCT_SPECS
 } from './thresholds';
 import {
   cleanKey, parseDate, getVal, findSheet,
@@ -7,6 +8,73 @@ import {
 } from './parsers';
 
 const DEBUG = false;
+
+// ====================================================================
+// ANOMALY DETECTION HELPER FUNCTIONS
+// ====================================================================
+
+/**
+ * Determine if system is currently charging based on current and state
+ */
+const isCharging = (current, systemState) => {
+  if (current != null && current < -1) return true; // Negative current = charging
+  if (systemState && typeof systemState === 'string') {
+    const lower = systemState.toLowerCase();
+    if (lower.includes('charg') && !lower.includes('discharg')) return true;
+  }
+  return false;
+};
+
+/**
+ * Determine if system is currently discharging
+ */
+const isDischarging = (current, systemState) => {
+  if (current != null && current > 1) return true; // Positive current = discharging
+  if (systemState && typeof systemState === 'string') {
+    const lower = systemState.toLowerCase();
+    if (lower.includes('discharg')) return true;
+  }
+  return false;
+};
+
+/**
+ * Calculate rate of change between two data points
+ */
+const calculateRate = (currentValue, previousValue, timeDeltaMs) => {
+  if (currentValue == null || previousValue == null || timeDeltaMs <= 0) return null;
+  return (currentValue - previousValue) / (timeDeltaMs / 1000); // per second
+};
+
+/**
+ * Validate data quality - returns array of issues found
+ */
+const validateDataPoint = (e, T) => {
+  const issues = [];
+  const dv = T.dataValidation;
+
+  // Cell voltage validation
+  const cellVoltages = Object.values(e.cells || {}).filter(v => v != null);
+  for (const v of cellVoltages) {
+    if (v < dv.cellVoltage.min || v > dv.cellVoltage.max) {
+      issues.push({ type: 'sensor_fault', param: 'cellVoltage', value: v, message: `Cell voltage ${v}mV outside valid range` });
+    }
+  }
+
+  // Temperature validation
+  const temps = Object.entries(e).filter(([k]) => /^temp\d+$/.test(k)).map(([,v]) => v).filter(v => v != null);
+  for (const t of temps) {
+    if (t < dv.temperature.min || t > dv.temperature.max) {
+      issues.push({ type: 'sensor_fault', param: 'temperature', value: t, message: `Temperature ${t}°C outside valid range` });
+    }
+  }
+
+  // SOC validation
+  if (e.soc != null && (e.soc < dv.soc.min || e.soc > dv.soc.max)) {
+    issues.push({ type: 'data_fault', param: 'soc', value: e.soc, message: `SOC ${e.soc}% outside valid range 0-100%` });
+  }
+
+  return issues;
+};
 
 export const processData = (sheets) => {
   if (DEBUG) console.log('Processing sheets:', Object.keys(sheets));
@@ -108,8 +176,8 @@ export const processData = (sheets) => {
           if (minCellIndex === null || cellIdx < minCellIndex) minCellIndex = cellIdx;
           if (maxCellIndex === null || cellIdx > maxCellIndex) maxCellIndex = cellIdx;
 
-          // Check for anomalies using new three-level thresholds
-          if (v > THRESHOLDS.cellVoltage.critical || v < THRESHOLDS.cellVoltage.bad.min) {
+          // Check for anomalies using three-level thresholds
+          if (v > THRESHOLDS.cellVoltage.absoluteMax || v < THRESHOLDS.cellVoltage.absoluteMin) {
             hasAnomaly = true;
             anomalyCells.push({ cell: cellIdx, voltage: v });
           }
@@ -136,7 +204,7 @@ export const processData = (sheets) => {
             if (minCellIndex === null || cellIdx < minCellIndex) minCellIndex = cellIdx;
             if (maxCellIndex === null || cellIdx > maxCellIndex) maxCellIndex = cellIdx;
 
-            if (v > THRESHOLDS.cellVoltage.critical || v < THRESHOLDS.cellVoltage.bad.min) {
+            if (v > THRESHOLDS.cellVoltage.absoluteMax || v < THRESHOLDS.cellVoltage.absoluteMin) {
               hasAnomaly = true;
               anomalyCells.push({ cell: cellIdx, voltage: v });
             }
@@ -153,34 +221,34 @@ export const processData = (sheets) => {
       console.log('Sample cell values:', cellKeys.slice(0, 5).map(k => `${k}=${e[k]}`).join(', '));
     }
 
-    // Check for cell imbalance (voltage spread) using new three-level system
-    if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDiff.critical) {
+    // Check for cell imbalance (voltage spread) using PSI three-level system
+    if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level3) {
       detectedAnomalies.push({
         type: 'imbalance',
         time: t,
         timeStr: t.toLocaleString(),
         rowIdx,
-        description: `CRITICAL cell imbalance: ${e.cellDiff}mV spread (>150mV) - Reduce charge rate 50%, service soon`,
+        description: `CRITICAL cell imbalance: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level3}mV) - Bad cell or connection, risk of reversal`,
         cells: [],
         severity: 3
       });
-    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDiff.marginal) {
+    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level2) {
       detectedAnomalies.push({
         type: 'imbalance',
         time: t,
         timeStr: t.toLocaleString(),
         rowIdx,
-        description: `MARGINAL cell imbalance: ${e.cellDiff}mV spread (30-150mV) - Investigate weak cells, active balancing recommended`,
+        description: `WARNING cell imbalance: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level2}mV) - Weak cell suspected, limit depth of discharge`,
         cells: [],
         severity: 2
       });
-    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDiff.good) {
+    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level1) {
       detectedAnomalies.push({
         type: 'imbalance',
         time: t,
         timeStr: t.toLocaleString(),
         rowIdx,
-        description: `Cell imbalance detected: ${e.cellDiff}mV spread (>30mV) - Monitor trends`,
+        description: `Cell imbalance detected: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level1}mV) - BMS balancing should correct`,
         cells: [],
         severity: 1
       });
@@ -613,245 +681,427 @@ export const processData = (sheets) => {
     }
   }
 
-  // Additional anomaly detection pass - pack voltage, temperature, insulation, SOC, SOH
+  // ====================================================================
+  // PSI-COMPLIANT ANOMALY DETECTION - v2.0
+  // Three-level system aligned with PSI fault response hierarchy
+  // ====================================================================
+
+  // Track level 2 faults for compound detection
+  let activeLevel2Faults = [];
+
   for (const [ts, e] of dataMap) {
-    // Pack voltage monitoring using product specs
-    if (productSpec && !configMismatch && e.packVoltage != null) {
-      // BAD: Outside published pack operating range
-      if (e.packVoltage < productSpec.packVoltage.min || e.packVoltage > productSpec.packVoltage.max) {
+    const charging = isCharging(e.current, e.systemState);
+    const discharging = isDischarging(e.current, e.systemState);
+    activeLevel2Faults = []; // Reset per timestamp
+
+    // ================================================================
+    // DATA VALIDATION - Check for sensor faults before processing
+    // ================================================================
+    const validationIssues = validateDataPoint(e, THRESHOLDS);
+    for (const issue of validationIssues) {
+      detectedAnomalies.push({
+        type: issue.type,
+        time: e.time,
+        timeStr: e.time.toLocaleString(),
+        description: `DATA VALIDATION: ${issue.message}`,
+        cells: [],
+        severity: 3
+      });
+    }
+
+    // ================================================================
+    // PACK VOLTAGE MONITORING - PSI 3-level system
+    // ================================================================
+    if (e.packVoltage != null) {
+      const pvThresh = packSystem === '96V' ? THRESHOLDS.packVoltage96V : THRESHOLDS.packVoltage80V;
+
+      // Level 3 - Critical
+      if (e.packVoltage <= pvThresh.level3Low) {
         detectedAnomalies.push({
-          type: 'pack_voltage_spec',
+          type: 'pack_voltage',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `PACK VOLTAGE SPEC VIOLATION: ${e.packVoltage.toFixed(1)}V is outside operating range (${productSpec.packVoltage.min}V - ${productSpec.packVoltage.max}V) for ${productSpec.name} - Immediate action required`,
+          description: `LEVEL 3 CRITICAL: Pack voltage ${e.packVoltage.toFixed(1)}V ≤${pvThresh.level3Low}V - Severe over-discharge, copper plating risk, OPEN RELAY`,
+          cells: [],
+          severity: 3
+        });
+      } else if (e.packVoltage >= pvThresh.level3High) {
+        detectedAnomalies.push({
+          type: 'pack_voltage',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 3 CRITICAL: Pack voltage ${e.packVoltage.toFixed(1)}V ≥${pvThresh.level3High}V - Electrolyte breakdown risk, SHUTDOWN`,
           cells: [],
           severity: 3
         });
       }
-    }
-    // Legacy pack voltage monitoring (fallback if no product spec)
-    else if (packSystem && e.packVoltage != null) {
-      const thresholds = packSystem === '80V' ? THRESHOLDS.packVoltage80V : THRESHOLDS.packVoltage96V;
-
-      if (e.packVoltage < thresholds.bad.min || e.packVoltage > thresholds.bad.max) {
+      // Level 2 - Warning
+      else if (e.packVoltage <= pvThresh.level2Low) {
         detectedAnomalies.push({
           type: 'pack_voltage',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `CRITICAL pack voltage: ${e.packVoltage.toFixed(1)}V (${packSystem} system) - Outside safe operating range, power reduction required`,
-          cells: [],
-          severity: 3
-        });
-      } else if (e.packVoltage < thresholds.marginal.min || e.packVoltage > thresholds.marginal.max) {
-        detectedAnomalies.push({
-          type: 'pack_voltage',
-          time: e.time,
-          timeStr: e.time.toLocaleString(),
-          description: `MARGINAL pack voltage: ${e.packVoltage.toFixed(1)}V (${packSystem} system) - Check cell balance, prepare for power reduction`,
+          description: `LEVEL 2 WARNING: Pack voltage ${e.packVoltage.toFixed(1)}V at discharge cutoff (0% SOC) - Terminate discharge`,
           cells: [],
           severity: 2
         });
-      } else if (e.packVoltage < thresholds.good.min || e.packVoltage > thresholds.good.max) {
+        activeLevel2Faults.push('pack_voltage_low');
+      } else if (e.packVoltage >= pvThresh.level2High) {
         detectedAnomalies.push({
           type: 'pack_voltage',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `Pack voltage outside GOOD range: ${e.packVoltage.toFixed(1)}V (${packSystem} system) - Monitor trends`,
+          description: `LEVEL 2 WARNING: Pack voltage ${e.packVoltage.toFixed(1)}V >3.6V/cell - STOP CHARGING, accelerated degradation`,
+          cells: [],
+          severity: 2
+        });
+        activeLevel2Faults.push('pack_voltage_high');
+      }
+      // Level 1 - Informational
+      else if (e.packVoltage <= pvThresh.level1Low) {
+        detectedAnomalies.push({
+          type: 'pack_voltage',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 1 INFO: Pack voltage ${e.packVoltage.toFixed(1)}V - Low SOC, recharge soon`,
+          cells: [],
+          severity: 1
+        });
+      } else if (e.packVoltage >= pvThresh.level1High) {
+        detectedAnomalies.push({
+          type: 'pack_voltage',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 1 INFO: Pack voltage ${e.packVoltage.toFixed(1)}V - Approaching full charge`,
           cells: [],
           severity: 1
         });
       }
     }
 
-    // Temperature extremes - Three-level system
+    // ================================================================
+    // TEMPERATURE MONITORING - Context-aware (charging vs discharging)
+    // ================================================================
     if (e.maxTemp != null) {
-      if (e.maxTemp > THRESHOLDS.temp.critical || e.maxTemp < -30) {
+      const tempThresh = charging ? THRESHOLDS.tempCharging : THRESHOLDS.tempDischarging;
+
+      // COMPOUND FAULT: Low temp + Charging = ALWAYS Level 3
+      if (charging && e.maxTemp < COMPOUND_FAULTS.lowTempCharging.tempThreshold) {
         detectedAnomalies.push({
-          type: 'temperature',
+          type: 'compound_fault',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `CRITICAL temperature: ${e.maxTemp.toFixed(1)}°C - ${e.maxTemp > 60 ? 'Emergency shutdown risk' : 'Extremely low'}`,
+          description: `LEVEL 3 COMPOUND FAULT: Charging at ${e.maxTemp.toFixed(1)}°C (<0°C) - LITHIUM PLATING RISK - STOP CHARGING IMMEDIATELY`,
           cells: [],
           severity: 3
         });
-      } else if (e.maxTemp > THRESHOLDS.temp.badHigh) {
+      }
+      // Level 3 - Critical temperature
+      else if (e.maxTemp <= tempThresh.level3Low) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `BAD temperature: ${e.maxTemp.toFixed(1)}°C (>50°C) - Thermal runaway risk, reduce current 75%`,
+          description: `LEVEL 3 CRITICAL: Temperature ${e.maxTemp.toFixed(1)}°C ≤${tempThresh.level3Low}°C - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
           cells: [],
           severity: 3
         });
-      } else if (e.maxTemp < THRESHOLDS.temp.badLow) {
+      } else if (e.maxTemp >= tempThresh.level3High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `BAD temperature: ${e.maxTemp.toFixed(1)}°C (<5°C) - Risk of plating, heat before charging`,
+          description: `LEVEL 3 CRITICAL: Temperature ${e.maxTemp.toFixed(1)}°C ≥${tempThresh.level3High}°C - THERMAL RUNAWAY RISK - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
+          cells: [],
+          severity: 3
+        });
+      }
+      // Level 2 - Warning
+      else if (e.maxTemp <= tempThresh.level2Low) {
+        detectedAnomalies.push({
+          type: 'temperature',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 2 WARNING: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'Risk of lithium plating, pause charging' : 'Limit discharge current'}`,
           cells: [],
           severity: 2
         });
-      } else if (e.maxTemp > THRESHOLDS.temp.marginalHigh.min && e.maxTemp <= THRESHOLDS.temp.marginalHigh.max) {
+        activeLevel2Faults.push('temperature_low');
+      } else if (e.maxTemp >= tempThresh.level2High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `MARGINAL temperature: ${e.maxTemp.toFixed(1)}°C (40-50°C) - Prepare cooling if >45°C`,
+          description: `LEVEL 2 WARNING: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'Reduce current, activate cooling' : 'Limit discharge current, alert operator'}`,
+          cells: [],
+          severity: 2
+        });
+        activeLevel2Faults.push('temperature_high');
+      }
+      // Level 1 - Informational
+      else if (e.maxTemp <= tempThresh.level1Low) {
+        detectedAnomalies.push({
+          type: 'temperature',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 1 INFO: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'At minimum safe charging temp' : 'Reduced performance expected'}`,
           cells: [],
           severity: 1
         });
-      } else if (e.maxTemp >= THRESHOLDS.temp.marginalLow.min && e.maxTemp < THRESHOLDS.temp.marginalLow.max) {
+      } else if (e.maxTemp >= tempThresh.level1High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `MARGINAL temperature: ${e.maxTemp.toFixed(1)}°C (5-15°C) - Suboptimal, reduce current if <10°C`,
+          description: `LEVEL 1 INFO: Temperature ${e.maxTemp.toFixed(1)}°C - Approaching limit, prepare thermal management`,
           cells: [],
           severity: 1
         });
       }
     }
 
-    // Temperature spread (imbalance)
+    // ================================================================
+    // TEMPERATURE SPREAD (IMBALANCE)
+    // ================================================================
     if (e.tempDiff != null) {
-      if (e.tempDiff > THRESHOLDS.tempDiff.critical) {
+      if (e.tempDiff > THRESHOLDS.tempDiff.level3) {
         detectedAnomalies.push({
           type: 'temp_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `CRITICAL temperature spread: ${e.tempDiff.toFixed(1)}°C (>10°C) - Cell defect or contact resistance, isolate hot module`,
+          description: `LEVEL 3 CRITICAL: Temperature spread ${e.tempDiff.toFixed(1)}°C (>${THRESHOLDS.tempDiff.level3}°C) - Cell defect or contact resistance`,
           cells: [],
           severity: 3
         });
-      } else if (e.tempDiff > THRESHOLDS.tempDiff.marginal) {
+      } else if (e.tempDiff > THRESHOLDS.tempDiff.level2) {
         detectedAnomalies.push({
           type: 'temp_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `MARGINAL temperature spread: ${e.tempDiff.toFixed(1)}°C (5-10°C) - Investigate heat distribution, check airflow`,
+          description: `LEVEL 2 WARNING: Temperature spread ${e.tempDiff.toFixed(1)}°C - Investigate heat distribution, check airflow`,
           cells: [],
           severity: 2
         });
-      } else if (e.tempDiff > THRESHOLDS.tempDiff.good) {
+        activeLevel2Faults.push('temp_imbalance');
+      } else if (e.tempDiff > THRESHOLDS.tempDiff.level1) {
         detectedAnomalies.push({
           type: 'temp_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `Temperature spread detected: ${e.tempDiff.toFixed(1)}°C (>5°C) - Monitor trends`,
+          description: `LEVEL 1 INFO: Temperature spread ${e.tempDiff.toFixed(1)}°C - Monitor trends`,
           cells: [],
           severity: 1
         });
       }
     }
 
-    // Insulation resistance - Three-level system (CORRECTED per PSI spec: ≥20MΩ minimum)
+    // ================================================================
+    // CELL VOLTAGE DELTA (IMBALANCE) - PSI 3-level system
+    // ================================================================
+    if (e.cellDiff != null) {
+      // COMPOUND FAULT: High delta + Low SOC = Level 3
+      if (e.cellDiff > COMPOUND_FAULTS.highDeltaLowSoc.deltaThreshold &&
+          e.soc != null && e.soc < COMPOUND_FAULTS.highDeltaLowSoc.socThreshold) {
+        detectedAnomalies.push({
+          type: 'compound_fault',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 3 COMPOUND FAULT: Cell imbalance ${e.cellDiff}mV + Low SOC ${e.soc?.toFixed(1)}% - HIGH RISK OF CELL REVERSAL`,
+          cells: [],
+          severity: 3
+        });
+      }
+      // Level 3 - Critical imbalance
+      else if (e.cellDiff > THRESHOLDS.cellDelta.level3) {
+        detectedAnomalies.push({
+          type: 'cell_imbalance',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 3 CRITICAL: Cell imbalance ${e.cellDiff}mV (>${THRESHOLDS.cellDelta.level3}mV) - Bad cell or connection, risk of reversal`,
+          cells: [],
+          severity: 3
+        });
+      }
+      // Level 2 - Warning
+      else if (e.cellDiff > THRESHOLDS.cellDelta.level2) {
+        detectedAnomalies.push({
+          type: 'cell_imbalance',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 2 WARNING: Cell imbalance ${e.cellDiff}mV - Weak cell suspected, limit depth of discharge`,
+          cells: [],
+          severity: 2
+        });
+        activeLevel2Faults.push('cell_imbalance');
+      }
+      // Level 1 - Informational
+      else if (e.cellDiff > THRESHOLDS.cellDelta.level1) {
+        detectedAnomalies.push({
+          type: 'cell_imbalance',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 1 INFO: Cell imbalance ${e.cellDiff}mV - Minor, BMS balancing should correct`,
+          cells: [],
+          severity: 1
+        });
+      }
+    }
+
+    // ================================================================
+    // INSULATION RESISTANCE - PSI 3-level system
+    // ================================================================
     if (e.insulationRes != null && e.insulationRes < THRESHOLDS.insulation.open) {
-      if (e.insulationRes < THRESHOLDS.insulation.bad) {
+      if (e.insulationRes <= THRESHOLDS.insulation.level3) {
         detectedAnomalies.push({
           type: 'insulation',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `BAD insulation: ${formatInsulation(e.insulationRes)} (<20MΩ) - BELOW PSI MINIMUM SPEC - Immediate corrective action required`,
+          description: `LEVEL 3 CRITICAL: Insulation ${formatInsulation(e.insulationRes)} (≤200kΩ) - Severe failure, OPEN MAIN RELAY`,
           cells: [],
           severity: 3
         });
-      } else if (e.insulationRes < THRESHOLDS.insulation.marginal) {
+      } else if (e.insulationRes <= THRESHOLDS.insulation.level2) {
         detectedAnomalies.push({
           type: 'insulation',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `MARGINAL insulation: ${formatInsulation(e.insulationRes)} (20-50MΩ) - Meets spec but trending down, investigate moisture/corrosion`,
+          description: `LEVEL 2 WARNING: Insulation ${formatInsulation(e.insulationRes)} (≤500kΩ) - Significant loss, REDUCE POWER 50%`,
           cells: [],
           severity: 2
         });
-      } else if (e.insulationRes < THRESHOLDS.insulation.good) {
+        activeLevel2Faults.push('insulation');
+      } else if (e.insulationRes <= THRESHOLDS.insulation.level1) {
         detectedAnomalies.push({
           type: 'insulation',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `Insulation below optimal: ${formatInsulation(e.insulationRes)} (50MΩ is optimal) - Monitor for degradation trends`,
+          description: `LEVEL 1 INFO: Insulation ${formatInsulation(e.insulationRes)} (<2MΩ) - Slight reduction, inspect for moisture`,
           cells: [],
           severity: 1
         });
       }
     }
 
-    // SOC monitoring
+    // ================================================================
+    // STATE OF CHARGE (SOC) - PSI 3-level system
+    // ================================================================
     if (e.soc != null) {
-      if (e.soc > THRESHOLDS.soc.badHigh) {
-        // BAD: >105% - Firmware error
+      // Data validation - SOC outside 0-100%
+      if (e.soc < THRESHOLDS.soc.validMin || e.soc > THRESHOLDS.soc.validMax) {
         detectedAnomalies.push({
-          type: 'soc',
+          type: 'soc_data_fault',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `SOC FIRMWARE ERROR: ${e.soc.toFixed(1)}% (>105%) - BMS firmware error, STOP and investigate`,
+          description: `LEVEL 3 DATA FAULT: SOC ${e.soc.toFixed(1)}% outside valid range 0-100% - Sensor/calibration fault`,
           cells: [],
           severity: 3
-        });
-      } else if (e.soc < THRESHOLDS.soc.badLow) {
-        // BAD: <5% - Over-discharge risk
-        detectedAnomalies.push({
-          type: 'soc',
-          time: e.time,
-          timeStr: e.time.toLocaleString(),
-          description: `SOC CRITICAL LOW: ${e.soc.toFixed(1)}% (<5%) - Over-discharge risk, investigate BMS discharge cutoff`,
-          cells: [],
-          severity: 3
-        });
-      } else if (e.soc > THRESHOLDS.soc.good.max && e.soc <= THRESHOLDS.soc.marginalHigh.max) {
-        // MARGINAL: 100-105% - Coulomb counting drift (only flag if OVER 100%)
-        detectedAnomalies.push({
-          type: 'soc',
-          time: e.time,
-          timeStr: e.time.toLocaleString(),
-          description: `SOC DRIFT: ${e.soc.toFixed(1)}% (100-105%) - Coulomb counting drift or measurement error, monitor and prepare recalibration`,
-          cells: [],
-          severity: 2
         });
       }
-      // GOOD: 5-100% - No anomaly flagged (100% is normal full charge)
-    }
-
-    // SOH monitoring
-    if (e.soh != null) {
-      if (e.soh < THRESHOLDS.soh.eol) {
+      // Level 2 - Critically low
+      else if (e.soc <= THRESHOLDS.soc.level2Low) {
         detectedAnomalies.push({
-          type: 'soh',
+          type: 'soc',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `SOH END OF LIFE: ${e.soh.toFixed(1)}% (<60%) - Replacement immediate, not operational`,
-          cells: [],
-          severity: 3
-        });
-      } else if (e.soh < THRESHOLDS.soh.badLevel2) {
-        detectedAnomalies.push({
-          type: 'soh',
-          time: e.time,
-          timeStr: e.time.toLocaleString(),
-          description: `SOH CRITICAL: ${e.soh.toFixed(1)}% (60-70%) - Critical replacement window, emergency mode`,
-          cells: [],
-          severity: 3
-        });
-      } else if (e.soh < THRESHOLDS.soh.badLevel1) {
-        detectedAnomalies.push({
-          type: 'soh',
-          time: e.time,
-          timeStr: e.time.toLocaleString(),
-          description: `SOH BAD: ${e.soh.toFixed(1)}% (70-80%) - Schedule replacement soon, 50% power derating`,
+          description: `LEVEL 2 WARNING: SOC ${e.soc.toFixed(1)}% (≤${THRESHOLDS.soc.level2Low}%) - Critically low, restrict power, stop operation`,
           cells: [],
           severity: 2
         });
-      } else if (e.soh < THRESHOLDS.soh.marginal) {
+        activeLevel2Faults.push('soc_low');
+      }
+      // Level 1 - Low battery warning
+      else if (e.soc < THRESHOLDS.soc.level1Low) {
         detectedAnomalies.push({
-          type: 'soh',
+          type: 'soc',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `SOH MARGINAL: ${e.soh.toFixed(1)}% (80-90%) - Begin replacement planning, monitor closely`,
+          description: `LEVEL 1 INFO: SOC ${e.soc.toFixed(1)}% (<${THRESHOLDS.soc.level1Low}%) - Low battery warning, plan recharging`,
           cells: [],
           severity: 1
         });
       }
+    }
+
+    // ================================================================
+    // STATE OF HEALTH (SOH) - PSI 3-level system
+    // ================================================================
+    if (e.soh != null) {
+      if (e.soh < THRESHOLDS.soh.level3) {
+        detectedAnomalies.push({
+          type: 'soh',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 3 CRITICAL: SOH ${e.soh.toFixed(1)}% (<${THRESHOLDS.soh.level3}%) - Severe degradation, REMOVE FROM SERVICE`,
+          cells: [],
+          severity: 3
+        });
+      } else if (e.soh <= THRESHOLDS.soh.level2) {
+        detectedAnomalies.push({
+          type: 'soh',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 2 WARNING: SOH ${e.soh.toFixed(1)}% (≤${THRESHOLDS.soh.level2}%) - End-of-Life threshold, schedule replacement`,
+          cells: [],
+          severity: 2
+        });
+        activeLevel2Faults.push('soh_eol');
+      } else if (e.soh <= THRESHOLDS.soh.level1) {
+        detectedAnomalies.push({
+          type: 'soh',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 1 INFO: SOH ${e.soh.toFixed(1)}% (≤${THRESHOLDS.soh.level1}%) - Moderate degradation, begin replacement planning`,
+          cells: [],
+          severity: 1
+        });
+      }
+    }
+
+    // ================================================================
+    // COMPOUND FAULT: Multiple Level 2 faults = Escalate to Level 3
+    // ================================================================
+    if (activeLevel2Faults.length >= COMPOUND_FAULTS.multipleLevel2.count) {
+      detectedAnomalies.push({
+        type: 'compound_fault',
+        time: e.time,
+        timeStr: e.time.toLocaleString(),
+        description: `LEVEL 3 COMPOUND FAULT: Multiple Level 2 conditions active (${activeLevel2Faults.join(', ')}) - Systemic issue, immediate attention required`,
+        cells: [],
+        severity: 3
+      });
+    }
+
+    // ================================================================
+    // COMPOUND FAULT: High Temp + High Current
+    // ================================================================
+    if (e.maxTemp != null && e.maxTemp > COMPOUND_FAULTS.highTempHighCurrent.tempThreshold &&
+        productSpec?.current && e.current != null) {
+      const currentPercent = Math.abs(e.current) / productSpec.current.dischargeContinuous * 100;
+      if (currentPercent > COMPOUND_FAULTS.highTempHighCurrent.currentPercent) {
+        detectedAnomalies.push({
+          type: 'compound_fault',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `COMPOUND ESCALATION: High temp ${e.maxTemp.toFixed(1)}°C + High current ${Math.abs(e.current).toFixed(0)}A (${currentPercent.toFixed(0)}%) - Heat generation compounds, escalate severity`,
+          cells: [],
+          severity: 3
+        });
+      }
+    }
+
+    // ================================================================
+    // COMPOUND FAULT: High Temp + High SOC
+    // ================================================================
+    if (e.maxTemp != null && e.maxTemp > COMPOUND_FAULTS.highTempHighSoc.tempThreshold &&
+        e.soc != null && e.soc > COMPOUND_FAULTS.highTempHighSoc.socThreshold) {
+      detectedAnomalies.push({
+        type: 'compound_fault',
+        time: e.time,
+        timeStr: e.time.toLocaleString(),
+        description: `COMPOUND ESCALATION: High temp ${e.maxTemp.toFixed(1)}°C + High SOC ${e.soc.toFixed(1)}% - Fully charged cells more vulnerable to thermal stress`,
+        cells: [],
+        severity: 3
+      });
     }
   }
 

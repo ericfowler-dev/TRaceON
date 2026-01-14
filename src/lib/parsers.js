@@ -100,32 +100,36 @@ export const iterativeMergeSort = (arr, compareFn) => {
   return result;
 };
 
-// Heat map for cell voltages (mV) - Three-level boundary system
+// Heat map for cell voltages (mV) - Three-level boundary system (PSI v2.0)
 export const getVoltageHeatMap = (voltage, minV, maxV, avgV) => {
   if (voltage == null) return { bg: 'bg-slate-700/80', text: 'text-slate-400', label: 'NO DATA' };
 
-  if (voltage > THRESHOLDS.cellVoltage.critical || voltage < 1000) {
+  // Sensor fault or impossible value
+  if (voltage > THRESHOLDS.cellVoltage.sensorFault || voltage < 1000) {
     return { bg: 'bg-red-600/90', text: 'text-white', label: 'ERROR' };
   }
 
-  if (voltage < THRESHOLDS.cellVoltage.marginal.min || voltage > THRESHOLDS.cellVoltage.marginal.max) {
-    if (voltage < THRESHOLDS.cellVoltage.good.min) {
+  // Critical low/high - outside safe operating range
+  if (voltage < THRESHOLDS.cellVoltage.dischargeMin || voltage > THRESHOLDS.cellVoltage.absoluteMax) {
+    if (voltage < THRESHOLDS.cellVoltage.dischargeMin) {
       return { bg: 'bg-red-500/80', text: 'text-white', label: 'LOW' };
     } else {
       return { bg: 'bg-red-500/80', text: 'text-white', label: 'HIGH' };
     }
   }
 
-  if (voltage < THRESHOLDS.cellVoltage.good.min || voltage > THRESHOLDS.cellVoltage.good.max) {
-    if (voltage < THRESHOLDS.cellVoltage.good.min) {
+  // Warning - outside nominal but within safe range
+  if (voltage < THRESHOLDS.cellVoltage.nominal.min || voltage > THRESHOLDS.cellVoltage.nominal.max) {
+    if (voltage < THRESHOLDS.cellVoltage.nominal.min) {
       return { bg: 'bg-amber-500/80', text: 'text-slate-900', label: 'BELOW' };
     } else {
       return { bg: 'bg-amber-500/80', text: 'text-slate-900', label: 'ABOVE' };
     }
   }
 
-  const goodRange = THRESHOLDS.cellVoltage.good.max - THRESHOLDS.cellVoltage.good.min;
-  const position = (voltage - THRESHOLDS.cellVoltage.good.min) / goodRange;
+  // Within nominal range - color by position
+  const nominalRange = THRESHOLDS.cellVoltage.nominal.max - THRESHOLDS.cellVoltage.nominal.min;
+  const position = (voltage - THRESHOLDS.cellVoltage.nominal.min) / nominalRange;
 
   if (position < 0.3) {
     return { bg: 'bg-green-500/70', text: 'text-white', label: 'GOOD' };

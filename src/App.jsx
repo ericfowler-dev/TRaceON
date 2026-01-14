@@ -1017,7 +1017,7 @@ const BMSAnalyzer = () => {
               </div>
               <div className="flex flex-col">
                 <span className="console-font text-[10px] font-bold text-cyan-500/70 uppercase tracking-widest">BMS Analyzer</span>
-                <span className="text-[10px] text-slate-600">v1.3.2</span>
+                <span className="text-[10px] text-slate-600">v1.4.1</span>
               </div>
             </div>
             {fileName && (
@@ -1558,7 +1558,7 @@ const BMSAnalyzer = () => {
                     <div className="group relative">
                       <Info className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help transition-colors" />
                       <div className="absolute left-0 top-6 w-96 bg-slate-900 border border-cyan-500/30 rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                        <div className="text-sm font-bold text-cyan-400 mb-2">📊 Hybrid Anomaly Detection System</div>
+                        <div className="text-sm font-bold text-cyan-400 mb-2">📊 Anomaly Detection System</div>
                         <div className="text-xs text-slate-300 space-y-2">
                           <p><span className="font-semibold text-white">Industry-Calibrated Thresholds:</span> Alerts trigger only when BOTH statistical (Z-score) AND physical (voltage) thresholds are exceeded.</p>
                           <div className="bg-slate-800/50 rounded p-2 space-y-1">
