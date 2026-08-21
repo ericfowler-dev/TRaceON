@@ -20,13 +20,14 @@ import {
 } from './lib/thresholds';
 import {
   fmt, fmtTime, fmtDuration, formatInsulation,
-  iterativeMergeSort, getVoltageHeatMap, arrMin, arrMax
+  iterativeMergeSort, arrMin, arrMax
 } from './lib/parsers';
 
 // Import extracted chart components
 import PackSocChart from './components/charts/PackSocChart';
 import CellVoltageChart from './components/charts/CellVoltageChart';
 import CellImbalanceChart from './components/charts/CellImbalanceChart';
+import CellVoltageHeatMaps from './components/CellVoltageHeatMaps';
 
 // =============================================================================
 // DEBUG FLAG - Set to true to enable console logging
@@ -90,6 +91,8 @@ const analysisInitialState = {
   timeSeries: [],
   faultEvents: [],
   anomalies: [],
+  anomalySampleCount: 0,
+  balanceAnalysis: null,
   deviceInfo: {},
   cellIndexRange: null,
   selectedDate: 'all',
@@ -107,6 +110,8 @@ function analysisReducer(state, action) {
         timeSeries: action.payload.timeSeries,
         faultEvents: action.payload.faultEvents,
         anomalies: action.payload.anomalies,
+        anomalySampleCount: action.payload.anomalySampleCount || 0,
+        balanceAnalysis: action.payload.balanceAnalysis || null,
         deviceInfo: action.payload.deviceInfo,
         cellIndexRange: action.payload.cellIndexRange || null,
         selectedDate: 'all',
@@ -145,7 +150,7 @@ function analysisReducer(state, action) {
 const BMSAnalyzer = () => {
   // Analysis state managed by reducer (prevents cross-field bugs)
   const [state, dispatch] = useReducer(analysisReducer, analysisInitialState);
-  const { timeSeries, faultEvents, anomalies, deviceInfo, cellIndexRange, selectedDate, playbackIdx, isPlaying, playbackSpeed, chartZoom } = state;
+  const { timeSeries, faultEvents, anomalies, anomalySampleCount, balanceAnalysis, deviceInfo, cellIndexRange, selectedDate, playbackIdx, isPlaying, playbackSpeed, chartZoom } = state;
 
   // UI state (remains as individual useState for simplicity)
   const [rawSheets, setRawSheets] = useState({});
@@ -157,10 +162,14 @@ const BMSAnalyzer = () => {
   const [expandedSheets, setExpandedSheets] = useState({});
   const [showAllRows, setShowAllRows] = useState({});
   const [searchTime, setSearchTime] = useState('');
-  const [has12VAux, setHas12VAux] = useState(false); // 80V battery 12V AUX option
+  const [has12VAux, setHas12VAux] = useState(true); // 12V AUX is the recommended 80V default
+  const [sensitivityPreset, setSensitivityPreset] = useState('balanced');
+  const [anomalySeverityFilter, setAnomalySeverityFilter] = useState('all');
+  const [showChargingAnomalies, setShowChargingAnomalies] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const workerRef = useRef(null);
   const reportRef = useRef(null);
+  const pendingFileLoadRef = useRef(false);
 
   useEffect(() => {
     if (PERF) console.log(`[perf] tab change: ${activeTab}`);
@@ -174,12 +183,21 @@ const BMSAnalyzer = () => {
     worker.onmessage = (event) => {
       const message = event.data || {};
       if (message.type === 'loaded') {
+        if (pendingFileLoadRef.current) {
+          const loadedCellCount = message.cellIndexRange?.count
+            || Object.keys(message.timeSeries?.find(sample => Object.keys(sample.cells || {}).length)?.cells || {}).length;
+          const loadedProduct = loadedCellCount ? detectProduct(loadedCellCount) : null;
+          setHas12VAux(Boolean(loadedProduct?.key?.startsWith('80V')));
+          pendingFileLoadRef.current = false;
+        }
         dispatch({
           type: 'FILE_LOADED',
           payload: {
             timeSeries: message.timeSeries || [],
             faultEvents: message.faultEvents || [],
             anomalies: message.anomalies || [],
+            anomalySampleCount: message.anomalySampleCount || 0,
+            balanceAnalysis: message.balanceAnalysis || null,
             deviceInfo: message.deviceInfo || {},
             cellIndexRange: message.cellIndexRange || null
           }
@@ -194,12 +212,14 @@ const BMSAnalyzer = () => {
         return;
       }
       if (message.type === 'error') {
+        pendingFileLoadRef.current = false;
         setError(message.message || 'Worker error');
         setIsLoading(false);
       }
     };
 
     worker.onerror = (err) => {
+      pendingFileLoadRef.current = false;
       console.error('Worker error:', err);
       setError(err?.message || 'Worker error');
       setIsLoading(false);
@@ -261,9 +281,11 @@ const BMSAnalyzer = () => {
     setRawSheetNames([]);
     setExpandedSheets({});
     setShowAllRows({});
-    setHas12VAux(false); // Reset 12V AUX option for new file
+    setHas12VAux(true); // Recommended default for supported 80V products
+    pendingFileLoadRef.current = true;
     setActiveTab('overview'); // Always start on overview tab for new file
     if (!workerRef.current) {
+      pendingFileLoadRef.current = false;
       setError('Worker not ready');
       setIsLoading(false);
       return;
@@ -273,16 +295,30 @@ const BMSAnalyzer = () => {
     reader.onload = (evt) => {
       try {
         const buffer = evt.target.result;
-        workerRef.current.postMessage({ type: 'load', buffer }, [buffer]);
+        workerRef.current.postMessage({ type: 'load', buffer, options: { sensitivityPreset } }, [buffer]);
       } catch (err) {
+        pendingFileLoadRef.current = false;
         console.error('Parse error:', err);
         setError('Failed to parse file: ' + err.message);
         setIsLoading(false);
       }
     };
+    reader.onerror = () => {
+      pendingFileLoadRef.current = false;
+      setError('Failed to read the selected workbook.');
+      setIsLoading(false);
+    };
 
     // Use ArrayBuffer instead of BinaryString for better memory handling
     reader.readAsArrayBuffer(file);
+  };
+
+  const handleSensitivityChange = (preset) => {
+    setSensitivityPreset(preset);
+    if (!timeSeries.length || !workerRef.current) return;
+    setIsLoading(true);
+    setError(null);
+    workerRef.current.postMessage({ type: 'reanalyze', options: { sensitivityPreset: preset } });
   };
 
   // ---------------------------------------------------------------------------
@@ -297,6 +333,21 @@ const BMSAnalyzer = () => {
     if (selectedDate === 'all') return timeSeries;
     return timeSeries.filter(d => d.dateKey === selectedDate);
   }, [timeSeries, selectedDate]);
+
+  const visibleAnomalies = useMemo(() => anomalies.filter(anomaly => {
+    if (anomalySeverityFilter !== 'all' && anomaly.severity !== Number(anomalySeverityFilter)) return false;
+    const states = anomaly.operatingStates?.length
+      ? anomaly.operatingStates
+      : [anomaly.operatingState].filter(Boolean);
+    const chargingOnly = states.length > 0 && states.every(state => state.startsWith('CHARGING'));
+    if (!showChargingAnomalies && chargingOnly && anomaly.severity < 3) return false;
+    if (selectedDate !== 'all') {
+      const anomalyDate = anomaly.time instanceof Date ? anomaly.time : new Date(anomaly.time);
+      const anomalyDateKey = `${anomalyDate.getFullYear()}-${String(anomalyDate.getMonth() + 1).padStart(2, '0')}-${String(anomalyDate.getDate()).padStart(2, '0')}`;
+      if (anomalyDateKey !== selectedDate) return false;
+    }
+    return true;
+  }), [anomalies, anomalySeverityFilter, selectedDate, showChargingAnomalies]);
 
   const stats = useMemo(() => {
     if (!filteredData.length) return null;
@@ -328,12 +379,7 @@ const BMSAnalyzer = () => {
           return fDateKey === selectedDate;
         });
 
-    const dateFilteredAnomalies = selectedDate === 'all' ? anomalies
-      : anomalies.filter(a => {
-          const ad = a.time;
-          const aDateKey = `${ad.getFullYear()}-${String(ad.getMonth()+1).padStart(2,'0')}-${String(ad.getDate()).padStart(2,'0')}`;
-          return aDateKey === selectedDate;
-        });
+    const dateFilteredAnomalies = visibleAnomalies;
 
     // Energy stats
     const energyData = filteredData.filter(d => d.accChargedEnergy || d.accDischargedEnergy);
@@ -407,7 +453,7 @@ const BMSAnalyzer = () => {
       );
     }
     return result;
-  }, [filteredData, faultEvents, anomalies, selectedDate, cellIndexRange]);
+  }, [filteredData, faultEvents, visibleAnomalies, selectedDate, cellIndexRange]);
 
   // Smart relay configuration based on device info, cell count, and 12V AUX option
   const relayConfig = useMemo(() => {
@@ -424,10 +470,10 @@ const BMSAnalyzer = () => {
   }, [stats]);
 
   useEffect(() => {
-    if (!isAuxSupported && has12VAux) {
+    if (stats?.cellCount && !pendingFileLoadRef.current && !isAuxSupported && has12VAux) {
       setHas12VAux(false);
     }
-  }, [isAuxSupported, has12VAux]);
+  }, [stats?.cellCount, isAuxSupported, has12VAux]);
 
   // Helper to enhance fault names with actual relay names instead of relay IDs
   const getEnhancedFaultName = (fault) => {
@@ -576,6 +622,7 @@ const BMSAnalyzer = () => {
         maxTemp: d.maxTemp != null && d.maxTemp > -40 && d.maxTemp < 150 ? d.maxTemp : null,
         minTemp: d.minTemp != null && d.minTemp > -40 && d.minTemp < 150 ? d.minTemp : null,
         systemState: d.systemState,
+        operatingState: d.operatingState,
         hasCells,
         ...cellVoltages,
         ...temps
@@ -671,13 +718,13 @@ const BMSAnalyzer = () => {
 
   // Anomaly summary - aggregates anomalies by type with date ranges
   const anomalySummary = useMemo(() => {
-    if (!anomalies.length) return null;
+    if (!visibleAnomalies.length) return null;
 
     const byType = {};
     let globalStart = null;
     let globalEnd = null;
 
-    anomalies.forEach(a => {
+    visibleAnomalies.forEach(a => {
       const type = a.type;
       if (!byType[type]) {
         byType[type] = { count: 0, earliest: null, latest: null };
@@ -696,8 +743,8 @@ const BMSAnalyzer = () => {
       if (!globalEnd || aTime > globalEnd) globalEnd = aTime;
     });
 
-    return { byType, globalStart, globalEnd, total: anomalies.length };
-  }, [anomalies]);
+    return { byType, globalStart, globalEnd, total: visibleAnomalies.length };
+  }, [visibleAnomalies]);
 
   // Fault markers for charts - vertical lines at fault start/end
   const faultMarkers = useMemo(() => {
@@ -857,7 +904,7 @@ const BMSAnalyzer = () => {
     setRawSheetNames([]);
     setFileName('');
     setActiveTab('overview');
-    setHas12VAux(false);
+    setHas12VAux(true);
   };
 
   // ---------------------------------------------------------------------------
@@ -1017,7 +1064,7 @@ const BMSAnalyzer = () => {
               </div>
               <div className="flex flex-col">
                 <span className="console-font text-[10px] font-bold text-cyan-500/70 uppercase tracking-widest">BMS Analyzer</span>
-                <span className="text-[10px] text-slate-600">v1.4.1</span>
+                <span className="text-[10px] text-slate-600">v1.5.0</span>
               </div>
             </div>
             {fileName && (
@@ -1161,13 +1208,13 @@ const BMSAnalyzer = () => {
             </div>
 
             {/* Anomaly Alert */}
-            {anomalies.length > 0 && (
+            {visibleAnomalies.length > 0 && (
               <div className="bg-red-950/30 border border-red-800 rounded-xl p-4">
                 <div className="flex items-center gap-3">
                   <ShieldAlert className="w-6 h-6 text-red-400" />
                   <div className="flex-1">
-                    <div className="font-semibold text-red-400">{anomalies.length} Data Anomalies Detected</div>
-                    <div className="text-sm text-red-300/70">Abnormal Conditions found - Check Charts, Faults, and Snapshot Playback</div>
+                    <div className="font-semibold text-red-400">{visibleAnomalies.length} Consolidated Analysis Events</div>
+                    <div className="text-sm text-red-300/70">{anomalySampleCount} qualifying samples were debounced and grouped into actionable events.</div>
                   </div>
                   <button onClick={() => setActiveTab('faults')} className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm">
                     View Details
@@ -1192,7 +1239,7 @@ const BMSAnalyzer = () => {
                 icon={<AlertTriangle className={`w-5 h-5 ${stats.faults?.l3 || stats.anomalies ? 'text-red-400' : stats.faults?.total ? 'text-orange-400' : 'text-emerald-400'}`} />}
                 label="Issues"
                 value={stats.faults?.total + stats.anomalies || 'None'}
-                sub={stats.faults?.total ? `Faults: ${stats.faults.total} | Anomalies: ${stats.anomalies}` : 'All clear'}
+                sub={(stats.faults?.total || stats.anomalies) ? `Faults: ${stats.faults.total} | Events: ${stats.anomalies}` : 'All clear'}
                 alert={stats.faults?.l3 > 0 || stats.anomalies > 0}
               />
             </div>
@@ -1284,7 +1331,7 @@ const BMSAnalyzer = () => {
             )}
 
             {/* Issues & Anomaly Summary - Full Width at Bottom */}
-            {(faultEvents.length > 0 || anomalies.length > 0) && (
+            {(faultEvents.length > 0 || visibleAnomalies.length > 0) && (
               <div className="grid lg:grid-cols-3 gap-6">
                 {/* Issues Summary - Takes 2 columns */}
                 <div className="lg:col-span-2 bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
@@ -1297,7 +1344,7 @@ const BMSAnalyzer = () => {
                     </button>
                   </div>
                   <div className="divide-y divide-slate-800 max-h-96 overflow-y-auto">
-                    {anomalies.slice(0, 8).map((a, i) => (
+                    {visibleAnomalies.slice(0, 8).map((a, i) => (
                       <div key={`a-${i}`} className="p-4 flex items-center gap-4 hover:bg-slate-800/30 cursor-pointer transition-colors" onClick={() => jumpToAnomaly(a)}>
                         <div className="w-3 h-3 rounded-full bg-red-500 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -1515,7 +1562,7 @@ const BMSAnalyzer = () => {
               relayConfig={relayConfig}
             />
 
-            <CellImbalanceChart data={zoomedChartData} faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} />
+            <CellImbalanceChart data={zoomedChartData} faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} sensitivityPreset={sensitivityPreset} />
           </div>
             )}
           </>
@@ -1524,6 +1571,47 @@ const BMSAnalyzer = () => {
         {/* ==================== FAULTS ==================== */}
         {activeTab === 'faults' && (
           <div className="space-y-6 overflow-x-hidden">
+            <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-5 flex flex-col lg:flex-row lg:items-end gap-4">
+              <div className="flex-1">
+                <div className="text-xs font-bold uppercase tracking-wider text-cyan-400 mb-1">Analysis configuration</div>
+                <div className="text-sm text-slate-400">{isLoading ? 'Reanalyzing workbook…' : 'Critical charging events always remain visible.'}</div>
+              </div>
+              <label className="text-xs text-slate-400 uppercase tracking-wider">
+                Sensitivity
+                <select
+                  className="mt-2 block w-full min-w-36 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                  value={sensitivityPreset}
+                  onChange={(event) => handleSensitivityChange(event.target.value)}
+                >
+                  <option value="strict">Strict</option>
+                  <option value="balanced">Balanced</option>
+                  <option value="relaxed">Relaxed</option>
+                </select>
+              </label>
+              <label className="text-xs text-slate-400 uppercase tracking-wider">
+                Severity
+                <select
+                  className="mt-2 block w-full min-w-36 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white"
+                  value={anomalySeverityFilter}
+                  onChange={(event) => setAnomalySeverityFilter(event.target.value)}
+                >
+                  <option value="all">All levels</option>
+                  <option value="3">Level 3</option>
+                  <option value="2">Level 2</option>
+                  <option value="1">Level 1</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-3 rounded-lg border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showChargingAnomalies}
+                  onChange={(event) => setShowChargingAnomalies(event.target.checked)}
+                  className="accent-cyan-500"
+                />
+                Show charging events
+              </label>
+            </div>
+
             {/* Fault Summary Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
@@ -1549,42 +1637,44 @@ const BMSAnalyzer = () => {
             </div>
 
             {/* Anomalies Section */}
-            {anomalies.length > 0 && (
+            {visibleAnomalies.length > 0 && (
               <div className="bg-red-950/20 rounded-xl border border-red-800">
                 <div className="p-5 border-b border-red-800/50">
                   <h2 className="text-lg font-semibold flex items-center gap-2 text-red-400">
-                    <Flag className="w-5 h-5" /> Data Anomalies ({anomalies.length})
+                    <Flag className="w-5 h-5" /> Consolidated Analysis Events ({visibleAnomalies.length})
                     {/* Z-Score Info Tooltip */}
                     <div className="group relative">
                       <Info className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help transition-colors" />
                       <div className="absolute left-0 top-6 w-96 bg-slate-900 border border-cyan-500/30 rounded-lg p-4 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                         <div className="text-sm font-bold text-cyan-400 mb-2">📊 Anomaly Detection System</div>
                         <div className="text-xs text-slate-300 space-y-2">
-                          <p><span className="font-semibold text-white">Industry-Calibrated Thresholds:</span> Alerts trigger only when BOTH statistical (Z-score) AND physical (voltage) thresholds are exceeded.</p>
-                          <div className="bg-slate-800/50 rounded p-2 space-y-1">
-                            <div className="text-emerald-400">&lt;80mV: Normal operation (no alerts)</div>
-                            <div className="text-amber-400">80-100mV + Z&gt;2.0: Monitor trend</div>
-                            <div className="text-orange-400">100-200mV + Z&gt;2.5: Early imbalance</div>
-                            <div className="text-red-400">200-300mV + Z&gt;3.0: Degradation</div>
-                            <div className="text-red-500 font-bold">&gt;300mV: Dangerous imbalance</div>
-                          </div>
-                          <p className="text-slate-400 italic">Prevents false positives: A 4mV deviation (even with Z=2.29) is ignored as normal manufacturing variance. Alerts only trigger at 80+ mV deviations.</p>
+                          <p><span className="font-semibold text-white">Context-aware thresholds:</span> Cell spread is evaluated differently at rest, during CC/CV charging, under discharge load, and while balancing.</p>
+                          <p><span className="font-semibold text-white">Noise controls:</span> Non-critical readings must persist, then qualifying samples are consolidated into event windows with duration and peak severity.</p>
+                          <p className="text-slate-400 italic">Impossible sensor values are separated from battery-health diagnoses.</p>
                         </div>
                       </div>
                     </div>
                   </h2>
-                  <p className="text-sm text-red-300/70 mt-2">These readings are outside normal ranges - includes absolute threshold violations and statistical outliers (Z-score)</p>
+                  <p className="text-sm text-red-300/70 mt-2">{anomalySampleCount} qualifying samples grouped into {visibleAnomalies.length} actionable events.</p>
                 </div>
                 <div className="divide-y divide-red-800/30 max-h-96 overflow-y-auto overflow-x-hidden">
-                  {anomalies.map((a, i) => (
-                    <div key={i} className="p-5 hover:bg-red-900/10 cursor-pointer transition-colors" onClick={() => jumpToAnomaly(a)}>
+                  {visibleAnomalies.map((a, i) => (
+                    <div key={a.key || i} className="p-5 hover:bg-slate-800/30 cursor-pointer transition-colors" onClick={() => jumpToAnomaly(a)}>
                       <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${a.severity === 3 ? 'bg-red-500/20' : a.severity === 2 ? 'bg-orange-500/20' : 'bg-amber-500/20'}`}>
+                          <AlertTriangle className={`w-5 h-5 ${a.severity === 3 ? 'text-red-400' : a.severity === 2 ? 'text-orange-400' : 'text-amber-400'}`} />
                         </div>
                         <div className="flex-1">
-                          <div className="font-semibold text-red-400 text-base">{a.description}</div>
-                          <div className="text-sm text-slate-400 mt-1">{a.timeStr}</div>
+                          <div className={`font-semibold text-base ${a.severity === 3 ? 'text-red-400' : a.severity === 2 ? 'text-orange-400' : 'text-amber-400'}`}>{a.description}</div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                            <span className="rounded bg-slate-800 px-2 py-1 text-slate-200">Level {a.severity}</span>
+                            <span className="rounded bg-slate-800 px-2 py-1 text-cyan-300">{a.operatingState || 'UNKNOWN'}</span>
+                            <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">{a.sampleCount} sample{a.sampleCount === 1 ? '' : 's'}</span>
+                            {a.peakValue != null && <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">Peak {a.peakValue} {a.type.includes('voltage') || a.type.includes('imbalance') ? 'mV' : ''}</span>}
+                          </div>
+                          <div className="text-sm text-slate-400 mt-2">
+                            {a.timeStr}{a.endTimeStr && a.endTimeStr !== a.timeStr ? ` – ${a.endTimeStr}` : ''} · {fmtDuration((a.durationSeconds || 0) / 60)}
+                          </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {a.cells.slice(0, 12).map((c, j) => (
                               <span key={j} className="text-sm px-3 py-1.5 bg-red-900/50 text-red-300 rounded font-mono">
@@ -1766,7 +1856,7 @@ const BMSAnalyzer = () => {
                   ))}
                 </div>
               </div>
-            ) : anomalies.length === 0 && (
+            ) : visibleAnomalies.length === 0 && (
               <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-12 text-center">
                 <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-500" />
                 <h2 className="text-xl font-semibold text-emerald-400">No Issues Detected</h2>
@@ -1795,9 +1885,9 @@ const BMSAnalyzer = () => {
                 </div>
                 <button onClick={() => jumpToTime(searchTime)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-sm">Go</button>
 
-                {anomalies.length > 0 && (
+                {visibleAnomalies.length > 0 && (
                   <button
-                    onClick={() => jumpToAnomaly(anomalies[0])}
+                    onClick={() => jumpToAnomaly(visibleAnomalies[0])}
                     className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm flex items-center gap-1"
                   >
                     <Flag className="w-3 h-3" /> Jump to Anomaly
@@ -2103,7 +2193,7 @@ const BMSAnalyzer = () => {
                       <div className="bg-black/20 p-3 rounded text-[10px] text-slate-400 leading-relaxed border border-white/5">
                         <div className="flex gap-2 items-start mb-1">
                           <Info className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
-                          <p><strong className="text-slate-300">Default:</strong> Standard relay configuration. If your battery has a 12V auxiliary system, select "12V Auxiliary" to show correct relay names and mapping.</p>
+                          <p><strong className="text-slate-300">Default:</strong> 12V Auxiliary for supported 80V products. Select Standard only when the pack has no 12V auxiliary system.</p>
                         </div>
 
                         {/* Technical Details - Relay Mapping Cross Reference */}
@@ -2143,49 +2233,11 @@ const BMSAnalyzer = () => {
                 )}
               </div>
 
-              {/* Cell Voltages with Heat Map */}
-              <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6 md:col-span-2">
-                <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-base text-slate-300 flex items-center gap-2 font-semibold">
-                    <Battery className="w-5 h-5 text-emerald-400" /> Cell Voltages (mV) - Heat Map
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="px-2.5 py-1 rounded bg-orange-900/60 text-orange-200">LOW</span>
-                    <span className="px-2.5 py-1 rounded bg-yellow-900/50 text-yellow-200">BELOW</span>
-                    <span className="px-2.5 py-1 rounded bg-emerald-900/50 text-emerald-200">GOOD</span>
-                    <span className="px-2.5 py-1 rounded bg-cyan-900/50 text-cyan-200">ABOVE</span>
-                    <span className="px-2.5 py-1 rounded bg-blue-900/60 text-blue-200">HIGH</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-6 md:grid-cols-8 gap-2 text-sm font-mono max-h-96 overflow-y-auto p-2">
-                  {(() => {
-                    const cells = Object.entries(currentSnap.cells || {});
-                    // Filter out corrupt sensor readings (>5000mV or <1000mV)
-                    const validCells = cells.filter(([, v]) => v > 1000 && v < 5000);
-                    const voltages = validCells.map(([, v]) => v);
-                    const minV = voltages.length > 0 ? arrMin(voltages) : 0;
-                    const maxV = voltages.length > 0 ? arrMax(voltages) : 0;
-                    const avgV = voltages.length > 0 ? voltages.reduce((a, b) => a + b, 0) / voltages.length : 0;
-
-                    return validCells.map(([k, v]) => {
-                      const isBalancing = currentSnap.balancing?.[k] === 'ACTIVE';
-                      const heatMap = getVoltageHeatMap(v, minV, maxV, avgV);
-                      return (
-                        <div key={k} className={`px-3 py-2.5 rounded relative border ${heatMap.bg} ${heatMap.text} border-slate-700 hover:ring-2 hover:ring-cyan-500 transition-all`} title={`Cell ${k}: ${v}mV (${heatMap.label})`}>
-                          <div className="font-bold text-center text-sm">{k}</div>
-                          <div className="text-center text-sm mt-1">{v}</div>
-                          {isBalancing && <span className="absolute top-1 right-1 w-2 h-2 bg-cyan-400 rounded-full animate-pulse" title="Balancing" />}
-                        </div>
-                      );
-                    });
-                  })()}
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-3 gap-4 text-sm px-2">
-                  <div><span className="text-slate-500">Min:</span> <span className="font-mono text-orange-400">{currentSnap.minCellV ?? '—'}mV</span></div>
-                  <div><span className="text-slate-500">Max:</span> <span className="font-mono text-blue-400">{currentSnap.maxCellV ?? '—'}mV</span></div>
-                  <div><span className="text-slate-500">Δ:</span> <span className="font-mono text-red-400">{currentSnap.cellDiff ?? '—'}mV</span></div>
-                </div>
-              </div>
+              <CellVoltageHeatMaps
+                snapshot={currentSnap}
+                balanceAnalysis={balanceAnalysis}
+                sensitivityPreset={sensitivityPreset}
+              />
 
               {/* Temperatures */}
               <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">

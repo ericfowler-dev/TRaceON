@@ -1,11 +1,16 @@
 import {
   ALARM_MAPPING, SEVERITY_MAP, detectProduct, ALL_RELAYS, THRESHOLDS,
-  COMPOUND_FAULTS, PRODUCT_SPECS
-} from './thresholds';
+  COMPOUND_FAULTS
+} from './thresholds.js';
 import {
   cleanKey, parseDate, getVal, findSheet,
   formatInsulation, iterativeMergeSort
-} from './parsers';
+} from './parsers.js';
+import {
+  DEFAULT_ANALYSIS_OPTIONS, SENSITIVITY_PRESETS,
+  annotateOperatingStates, classifyCellImbalance, getCellBalanceThresholds,
+  analyzeChargeConvergence, debounceAnomalies, consolidateAnomalies
+} from './anomalyDetection.js';
 
 const DEBUG = false;
 
@@ -13,36 +18,9 @@ const DEBUG = false;
 // ANOMALY DETECTION HELPER FUNCTIONS
 // ====================================================================
 
-/**
- * Determine if system is currently charging based on current and state
- */
-const isCharging = (current, systemState) => {
-  if (current != null && current < -1) return true; // Negative current = charging
-  if (systemState && typeof systemState === 'string') {
-    const lower = systemState.toLowerCase();
-    if (lower.includes('charg') && !lower.includes('discharg')) return true;
-  }
-  return false;
-};
-
-/**
- * Determine if system is currently discharging
- */
-const isDischarging = (current, systemState) => {
-  if (current != null && current > 1) return true; // Positive current = discharging
-  if (systemState && typeof systemState === 'string') {
-    const lower = systemState.toLowerCase();
-    if (lower.includes('discharg')) return true;
-  }
-  return false;
-};
-
-/**
- * Calculate rate of change between two data points
- */
-const calculateRate = (currentValue, previousValue, timeDeltaMs) => {
-  if (currentValue == null || previousValue == null || timeDeltaMs <= 0) return null;
-  return (currentValue - previousValue) / (timeDeltaMs / 1000); // per second
+const parseOptionalNumber = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 };
 
 /**
@@ -53,7 +31,10 @@ const validateDataPoint = (e, T) => {
   const dv = T.dataValidation;
 
   // Cell voltage validation
-  const cellVoltages = Object.values(e.cells || {}).filter(v => v != null);
+  const cellVoltages = [...new Set([
+    ...Object.values(e.cells || {}), e.maxCellV, e.minCellV,
+    e.reportedMaxCellV, e.reportedMinCellV
+  ].filter(v => v != null))];
   for (const v of cellVoltages) {
     if (v < dv.cellVoltage.min || v > dv.cellVoltage.max) {
       issues.push({ type: 'sensor_fault', param: 'cellVoltage', value: v, message: `Cell voltage ${v}mV outside valid range` });
@@ -61,7 +42,11 @@ const validateDataPoint = (e, T) => {
   }
 
   // Temperature validation
-  const temps = Object.entries(e).filter(([k]) => /^temp\d+$/.test(k)).map(([,v]) => v).filter(v => v != null);
+  const temps = [
+    ...Object.entries(e).filter(([k]) => /^temp\d+$/.test(k)).map(([,v]) => v),
+    e.maxTemp,
+    e.minTemp
+  ].filter(v => v != null);
   for (const t of temps) {
     if (t < dv.temperature.min || t > dv.temperature.max) {
       issues.push({ type: 'sensor_fault', param: 'temperature', value: t, message: `Temperature ${t}°C outside valid range` });
@@ -73,11 +58,18 @@ const validateDataPoint = (e, T) => {
     issues.push({ type: 'data_fault', param: 'soc', value: e.soc, message: `SOC ${e.soc}% outside valid range 0-100%` });
   }
 
+  if (e.insulationRes != null && e.insulationRes < dv.insulationMin) {
+    issues.push({ type: 'sensor_fault', param: 'insulation', value: e.insulationRes, message: `Insulation ${e.insulationRes}kΩ is physically invalid` });
+  }
+
   return issues;
 };
 
-export const processData = (sheets) => {
+export const processData = (sheets, options = {}) => {
   if (DEBUG) console.log('Processing sheets:', Object.keys(sheets));
+  const sensitivityPreset = SENSITIVITY_PRESETS[options.sensitivityPreset]
+    ? options.sensitivityPreset
+    : DEFAULT_ANALYSIS_OPTIONS.sensitivityPreset;
 
   const voltages = findSheet(sheets, 'voltage', '0x9a');
   const temps = findSheet(sheets, 'temperature', '0x09');
@@ -147,20 +139,21 @@ export const processData = (sheets) => {
     const e = dataMap.get(ts);
 
     const packVal = voltagePackCol ? row[voltagePackCol] : getVal(row, 'Pack volt.(V)');
-    e.packVoltage = parseFloat(packVal) || undefined;
+    e.packVoltage = parseOptionalNumber(packVal);
     const currVal = voltageCurrentCol ? row[voltageCurrentCol] : getVal(row, 'Current(A)');
     const curr = parseFloat(currVal);
     e.current = isNaN(curr) ? undefined : curr;
+    const frameStartValue = Number.parseInt(getVal(row, "This frame's starting cell index N") ?? 0, 10);
+    const frameStart = Number.isFinite(frameStartValue) ? frameStartValue : 0;
 
-    // Extract ALL cell voltages and check for anomalies
-    let hasAnomaly = false;
-    const anomalyCells = [];
+    // Extract all cell voltages. Data-quality checks run after every sheet has
+    // been merged so impossible readings are not also diagnosed as cell faults.
     let firstCellLogged = false;
 
     if (voltageCellKeys.length > 0) {
       for (let i = 0; i < voltageCellKeys.length; i++) {
         const cellKey = voltageCellKeys[i];
-        const cellIdx = cellKey.idx;
+        const cellIdx = frameStart + cellKey.idx;
         // DEBUG: Log first cell voltage column to determine if 0-based or 1-based
         if (DEBUG && rowIdx === 0 && !firstCellLogged) {
           console.log('=== CELL INDEXING DEBUG ===');
@@ -176,11 +169,6 @@ export const processData = (sheets) => {
           if (minCellIndex === null || cellIdx < minCellIndex) minCellIndex = cellIdx;
           if (maxCellIndex === null || cellIdx > maxCellIndex) maxCellIndex = cellIdx;
 
-          // Check for anomalies using three-level thresholds
-          if (v > THRESHOLDS.cellVoltage.absoluteMax || v < THRESHOLDS.cellVoltage.absoluteMin) {
-            hasAnomaly = true;
-            anomalyCells.push({ cell: cellIdx, voltage: v });
-          }
         }
       }
     } else {
@@ -189,7 +177,7 @@ export const processData = (sheets) => {
         const k = rowKeys[i];
         const m = cleanKey(k).match(/Cell volt\.N\+(\d+)/i);
         if (m) {
-          const cellIdx = parseInt(m[1]);
+          const cellIdx = frameStart + parseInt(m[1], 10);
           if (DEBUG && rowIdx === 0 && !firstCellLogged) {
             console.log('=== CELL INDEXING DEBUG ===');
             console.log('First cell voltage column name:', k);
@@ -203,11 +191,6 @@ export const processData = (sheets) => {
             e[`cell${cellIdx}`] = v;
             if (minCellIndex === null || cellIdx < minCellIndex) minCellIndex = cellIdx;
             if (maxCellIndex === null || cellIdx > maxCellIndex) maxCellIndex = cellIdx;
-
-            if (v > THRESHOLDS.cellVoltage.absoluteMax || v < THRESHOLDS.cellVoltage.absoluteMin) {
-              hasAnomaly = true;
-              anomalyCells.push({ cell: cellIdx, voltage: v });
-            }
           }
         }
       }
@@ -221,52 +204,7 @@ export const processData = (sheets) => {
       console.log('Sample cell values:', cellKeys.slice(0, 5).map(k => `${k}=${e[k]}`).join(', '));
     }
 
-    // Check for cell imbalance (voltage spread) using PSI three-level system
-    if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level3) {
-      detectedAnomalies.push({
-        type: 'imbalance',
-        time: t,
-        timeStr: t.toLocaleString(),
-        rowIdx,
-        description: `CRITICAL cell imbalance: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level3}mV) - Bad cell or connection, risk of reversal`,
-        cells: [],
-        severity: 3
-      });
-    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level2) {
-      detectedAnomalies.push({
-        type: 'imbalance',
-        time: t,
-        timeStr: t.toLocaleString(),
-        rowIdx,
-        description: `WARNING cell imbalance: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level2}mV) - Weak cell suspected, limit depth of discharge`,
-        cells: [],
-        severity: 2
-      });
-    } else if (e.cellDiff && e.cellDiff > THRESHOLDS.cellDelta.level1) {
-      detectedAnomalies.push({
-        type: 'imbalance',
-        time: t,
-        timeStr: t.toLocaleString(),
-        rowIdx,
-        description: `Cell imbalance detected: ${e.cellDiff}mV spread (>${THRESHOLDS.cellDelta.level1}mV) - BMS balancing should correct`,
-        cells: [],
-        severity: 1
-      });
-    }
-
-    if (hasAnomaly) {
-      detectedAnomalies.push({
-        type: 'voltage',
-        time: t,
-        timeStr: t.toLocaleString(),
-        rowIdx,
-        description: `Abnormal cell voltages detected`,
-        cells: anomalyCells,
-        severity: anomalyCells.some(c => c.voltage > 10000) ? 3 : 2
-      });
-    }
   }
-
   // Process TEMPERATURES - Use for loop instead of forEach to avoid stack overflow
   for (let i = 0; i < temps.length; i++) {
     const row = temps[i];
@@ -288,7 +226,7 @@ export const processData = (sheets) => {
       const m = cleaned.match(/CellTemp(\d+)/i);
       if (m) {
         const v = parseFloat(row[k]);
-        if (!isNaN(v) && v > -50 && v < 150) e[`temp${m[1]}`] = v;
+        if (!isNaN(v)) e[`temp${m[1]}`] = v;
       }
     }
   }
@@ -306,16 +244,23 @@ export const processData = (sheets) => {
     }
     const e = dataMap.get(ts);
 
-    e.maxCellV = parseFloat(getVal(row, 'Max cell(mv)')) || undefined;
-    e.minCellV = parseFloat(getVal(row, 'Min cell(mv)')) || undefined;
+    e.maxCellV = parseOptionalNumber(getVal(row, 'Max cell(mv)'));
+    e.minCellV = parseOptionalNumber(getVal(row, 'Min cell(mv)'));
+    e.reportedMaxCellV = e.maxCellV;
+    e.reportedMinCellV = e.minCellV;
     e.maxCellId = getVal(row, 'Cell ID of max volt');
     e.minCellId = getVal(row, 'Cell ID of min');
-    e.maxTemp = parseFloat(getVal(row, 'Max temp.(℃)', 'Max temp')) || undefined;
-    e.minTemp = parseFloat(getVal(row, 'Min temp.(℃)', 'Min temp')) || undefined;
+    e.maxTemp = parseOptionalNumber(getVal(row, 'Max temp.(℃)', 'Max temp'));
+    e.minTemp = parseOptionalNumber(getVal(row, 'Min temp.(℃)', 'Min temp'));
     e.maxTempId = getVal(row, 'Max temp. ID');
     e.minTempId = getVal(row, 'Min temp. ID');
 
-    if (e.maxCellV && e.minCellV) e.cellDiff = e.maxCellV - e.minCellV;
+    if (e.maxCellV >= THRESHOLDS.dataValidation.cellVoltage.min
+        && e.maxCellV <= THRESHOLDS.dataValidation.cellVoltage.max
+        && e.minCellV >= THRESHOLDS.dataValidation.cellVoltage.min
+        && e.minCellV <= THRESHOLDS.dataValidation.cellVoltage.max) {
+      e.cellDiff = e.maxCellV - e.minCellV;
+    }
     if (e.maxTemp != null && e.minTemp != null && e.maxTemp > -40 && e.minTemp > -40) {
       e.tempDiff = e.maxTemp - e.minTemp;
     }
@@ -334,13 +279,13 @@ export const processData = (sheets) => {
     }
     const e = dataMap.get(ts);
 
-    e.soc = parseFloat(getVal(row, 'Shown SOC', 'Real SOC')) || undefined;
-    e.realSoc = parseFloat(getVal(row, 'Real SOC')) || undefined;
-    e.soh = parseFloat(getVal(row, 'SOH')) || undefined;
+    e.soc = parseOptionalNumber(getVal(row, 'Shown SOC', 'Real SOC'));
+    e.realSoc = parseOptionalNumber(getVal(row, 'Real SOC'));
+    e.soh = parseOptionalNumber(getVal(row, 'SOH'));
     e.systemState = getVal(row, 'System state');
-    e.insulationRes = parseFloat(getVal(row, 'Sys. insul. resistance')) || undefined;
-    e.posInsulation = parseFloat(getVal(row, 'Pos. insulation')) || undefined;
-    e.negInsulation = parseFloat(getVal(row, 'Neg. insulation')) || undefined;
+    e.insulationRes = parseOptionalNumber(getVal(row, 'Sys. insul. resistance'));
+    e.posInsulation = parseOptionalNumber(getVal(row, 'Pos. insulation'));
+    e.negInsulation = parseOptionalNumber(getVal(row, 'Neg. insulation'));
 
     // Parse SW1, SW2, DI1, DI2 states
     e.sw1 = getVal(row, 'SW1');
@@ -350,19 +295,19 @@ export const processData = (sheets) => {
 
     // Parse additional system metrics
     e.heartbeat = getVal(row, 'Heartbeat');
-    e.powerVolt = parseFloat(getVal(row, 'Power volt')) || undefined;
-    e.integralRatio = parseFloat(getVal(row, 'Integral ratio')) || undefined;
+    e.powerVolt = parseOptionalNumber(getVal(row, 'Power volt'));
+    e.integralRatio = parseOptionalNumber(getVal(row, 'Integral ratio'));
     e.resetSource = getVal(row, 'Reset source');
     e.wakeupSignal = getVal(row, 'Wake-up signal');
-    e.accVoltage = parseFloat(getVal(row, 'Acc. voltage')) || undefined;
+    e.accVoltage = parseOptionalNumber(getVal(row, 'Acc. voltage'));
 
     // High voltage measurements
-    e.hvbpos = parseFloat(getVal(row, 'HVBPOS')) || undefined;
-    e.hv1 = parseFloat(getVal(row, 'HV1')) || undefined;
-    e.hv2 = parseFloat(getVal(row, 'HV2')) || undefined;
-    e.hv3 = parseFloat(getVal(row, 'HV3')) || undefined;
-    e.hv4 = parseFloat(getVal(row, 'HV4')) || undefined;
-    e.hv5 = parseFloat(getVal(row, 'HV5')) || undefined;
+    e.hvbpos = parseOptionalNumber(getVal(row, 'HVBPOS'));
+    e.hv1 = parseOptionalNumber(getVal(row, 'HV1'));
+    e.hv2 = parseOptionalNumber(getVal(row, 'HV2'));
+    e.hv3 = parseOptionalNumber(getVal(row, 'HV3'));
+    e.hv4 = parseOptionalNumber(getVal(row, 'HV4'));
+    e.hv5 = parseOptionalNumber(getVal(row, 'HV5'));
 
     // Fault flags
     e.chgSelfDiagFault = getVal(row, 'Chg Self-Diag Fault');
@@ -435,10 +380,10 @@ export const processData = (sheets) => {
     }
     const e = dataMap.get(ts);
 
-    e.chargedEnergy = parseFloat(getVal(row, 'This time charged energy')) || undefined;
-    e.accChargedEnergy = parseFloat(getVal(row, 'Acc. charged energy')) || undefined;
-    e.dischargedEnergy = parseFloat(getVal(row, 'This time discharged energy')) || undefined;
-    e.accDischargedEnergy = parseFloat(getVal(row, 'Acc. discharged energy')) || undefined;
+    e.chargedEnergy = parseOptionalNumber(getVal(row, 'This time charged energy'));
+    e.accChargedEnergy = parseOptionalNumber(getVal(row, 'Acc. charged energy'));
+    e.dischargedEnergy = parseOptionalNumber(getVal(row, 'This time discharged energy'));
+    e.accDischargedEnergy = parseOptionalNumber(getVal(row, 'Acc. discharged energy'));
   }
 
   // Process CHARGING DATA - Use for loop instead of forEach to avoid stack overflow
@@ -455,14 +400,40 @@ export const processData = (sheets) => {
 
     e.chargerConnected = getVal(row, 'Charger conn.');
     e.chargingTime = getVal(row, 'Charging elapsed time');
-    e.chargeReqVolt = parseFloat(getVal(row, 'Charge Req. Volt.')) || undefined;
-    e.chargeReqCurr = parseFloat(getVal(row, 'Charge Req. Curr.')) || undefined;
-    e.chargerOutputVolt = parseFloat(getVal(row, 'Charger Output Volt.')) || undefined;
-    e.chargerOutputCurr = parseFloat(getVal(row, 'Charger Output Curr.')) || undefined;
+    e.chargeReqVolt = parseOptionalNumber(getVal(row, 'Charge Req. Volt.'));
+    e.chargeReqCurr = parseOptionalNumber(getVal(row, 'Charge Req. Curr.'));
+    e.chargerOutputVolt = parseOptionalNumber(getVal(row, 'Charger Output Volt.'));
+    e.chargerOutputCurr = parseOptionalNumber(getVal(row, 'Charger Output Curr.'));
     e.chargerFaultStat = getVal(row, 'Charger fault stat.');
-    e.chargerPortTemp1 = parseFloat(getVal(row, 'Charger port temp.01')) || undefined;
-    e.chargerPortTemp2 = parseFloat(getVal(row, 'Charger port temp.02')) || undefined;
-    e.chargerPortTemp3 = parseFloat(getVal(row, 'Charger port temp.03')) || undefined;
+    e.chargerPortTemp1 = parseOptionalNumber(getVal(row, 'Charger port temp.01'));
+    e.chargerPortTemp2 = parseOptionalNumber(getVal(row, 'Charger port temp.02'));
+    e.chargerPortTemp3 = parseOptionalNumber(getVal(row, 'Charger port temp.03'));
+  }
+
+  // Derive peak and delta values from the cell array when the optional Peak
+  // Data sheet is absent or contains an impossible sensor value.
+  for (const e of dataMap.values()) {
+    const validCells = Object.entries(e.cells || {}).filter(([, voltage]) => (
+      Number.isFinite(voltage)
+      && voltage >= THRESHOLDS.dataValidation.cellVoltage.min
+      && voltage <= THRESHOLDS.dataValidation.cellVoltage.max
+    ));
+    if (validCells.length < 2) continue;
+    let minCell = validCells[0];
+    let maxCell = validCells[0];
+    for (let i = 1; i < validCells.length; i++) {
+      if (validCells[i][1] < minCell[1]) minCell = validCells[i];
+      if (validCells[i][1] > maxCell[1]) maxCell = validCells[i];
+    }
+    if (!Number.isFinite(e.minCellV) || e.minCellV < 0 || e.minCellV > THRESHOLDS.dataValidation.cellVoltage.max) {
+      e.minCellV = minCell[1];
+      e.minCellId = minCell[0];
+    }
+    if (!Number.isFinite(e.maxCellV) || e.maxCellV < 0 || e.maxCellV > THRESHOLDS.dataValidation.cellVoltage.max) {
+      e.maxCellV = maxCell[1];
+      e.maxCellId = maxCell[0];
+    }
+    e.cellDiff = e.maxCellV - e.minCellV;
   }
 
   // ====================================================================
@@ -500,13 +471,12 @@ export const processData = (sheets) => {
   // Detect product based on cell count and validate pack voltage consistency
   // This MUST come before product-spec validation code
   // ====================================================================
-  let detectedProduct = null;
   let productSpec = null;
-  let configMismatch = false;
 
   // Compute entries array once and reuse throughout (avoids repeated Array.from calls)
   const entriesArray = Array.from(dataMap.values());
-  const firstEntry = entriesArray[0];
+  const sorted = iterativeMergeSort(entriesArray, (a, b) => a.ts - b.ts);
+  const firstEntry = sorted.find(entry => Object.keys(entry.cells || {}).length > 0) || sorted[0];
   if (firstEntry) {
     const cellCount = Object.keys(firstEntry.cells).length;
     const avgPackVoltage = firstEntry.packVoltage || 0;
@@ -514,7 +484,6 @@ export const processData = (sheets) => {
     // Detect product
     const detection = detectProduct(cellCount, avgPackVoltage);
     if (detection) {
-      detectedProduct = detection.key;
       productSpec = detection.spec;
 
       // VALIDATION: Check for series count misconfiguration
@@ -528,7 +497,6 @@ export const processData = (sheets) => {
         const tolerance = firstEntry.packVoltage * 0.05; // 5% tolerance
 
         if (voltageDifference > tolerance) {
-          configMismatch = true;
           detectedAnomalies.push({
             type: 'config_mismatch',
             time: firstEntry.time,
@@ -548,59 +516,62 @@ export const processData = (sheets) => {
     packSystem = productSpec.seriesCellCount === 24 ? '80V' : '96V';
   }
 
-  // ====================================================================
-  // PRODUCT-SPEC BASED PER-CELL VOLTAGE VALIDATION WITH HYSTERESIS
-  // Check each cell against product-specific absolute limits
-  // Derived from pack limits divided by series cell count (NOT total cells)
-  //
-  // HYSTERESIS DEADBAND: ±50mV tolerance to prevent false alarms from:
-  // - Normal charger CC/CV overshoot (30-100mV typical during transition)
-  // - Cell voltage monitor accuracy (±10-15mV)
-  // - Temperature-dependent voltage variation (±30-40mV)
-  // - Current-dependent IR drop (±20-30mV)
-  //
-  // Example: 3550mV spec with 50mV hysteresis → only flag if >3600mV or <2450mV
-  // This filters trivial 32mV overshoot while catching real problems at 100+ mV
-  // ====================================================================
-  if (productSpec && !configMismatch) {
-    const HYSTERESIS_MV = 50; // Industry-standard deadband for charger overshoot tolerance
+  annotateOperatingStates(sorted, {
+    ...options,
+    capacityAh: productSpec?.capacity
+  });
+  const balanceAnalysis = analyzeChargeConvergence(sorted);
 
-    // Only apply product-specific validation if we have valid product detection
-    for (const [ts, e] of dataMap) {
-      const cellEntries = Object.entries(e.cells);
-      for (let i = 0; i < cellEntries.length; i++) {
-        const [cellIdx, voltage] = cellEntries[i];
-        if (voltage == null || voltage < 1000 || voltage > 5000) continue;
-
-        // CRITICAL UNDERVOLTAGE: Below minimum with hysteresis (e.g., <2450mV for 2500mV spec)
-        if (voltage < (productSpec.cellVoltage.min - HYSTERESIS_MV)) {
-          detectedAnomalies.push({
-            type: 'cell_voltage_spec',
-            time: e.time,
-            timeStr: e.time.toLocaleString(),
-            description: `CRITICAL UNDERVOLTAGE - Cell #${cellIdx}: ${voltage}mV is ${(productSpec.cellVoltage.min - voltage).toFixed(0)}mV below minimum spec (${productSpec.cellVoltage.min}mV) for ${productSpec.name} - Over-discharge damage risk`,
-            cells: [{ cell: cellIdx, voltage, min: productSpec.cellVoltage.min, max: productSpec.cellVoltage.max }],
-            severity: 3
-          });
-        }
-        // CRITICAL OVERVOLTAGE: Above maximum with hysteresis (e.g., >3600mV for 3550mV spec)
-        // Filters normal 30-50mV charger overshoot; only flags sustained over-charging
-        else if (voltage > (productSpec.cellVoltage.max + HYSTERESIS_MV)) {
-          detectedAnomalies.push({
-            type: 'cell_voltage_spec',
-            time: e.time,
-            timeStr: e.time.toLocaleString(),
-            description: `CRITICAL OVERVOLTAGE - Cell #${cellIdx}: ${voltage}mV is ${(voltage - productSpec.cellVoltage.max).toFixed(0)}mV above maximum spec (${productSpec.cellVoltage.max}mV) for ${productSpec.name} - Sustained overcharge detected (exceeds ${HYSTERESIS_MV}mV hysteresis deadband)`,
-            cells: [{ cell: cellIdx, voltage, min: productSpec.cellVoltage.min, max: productSpec.cellVoltage.max }],
-            severity: 3
-          });
-        }
+  // PSI per-cell voltage bands. Impossible sensor values are excluded here and
+  // emitted separately by data validation.
+  for (const e of sorted) {
+    const underLoad = e.operatingState?.startsWith('DISCHARGING');
+    for (const [cellIdx, voltage] of Object.entries(e.cells)) {
+      if (!Number.isFinite(voltage) || voltage < 0 || voltage > THRESHOLDS.dataValidation.cellVoltage.max) continue;
+      let severity = 0;
+      let condition = '';
+      if (voltage >= THRESHOLDS.cellVoltage.absoluteMax) {
+        severity = 3;
+        condition = 'critical overvoltage — immediate shutdown';
+      } else if (voltage > THRESHOLDS.cellVoltage.level2High) {
+        severity = 2;
+        condition = 'overvoltage — stop charging';
+      } else if (voltage > THRESHOLDS.cellVoltage.level1High) {
+        severity = 1;
+        condition = 'approaching full-charge limit';
+      } else if (voltage < THRESHOLDS.cellVoltage.criticalLow) {
+        severity = 3;
+        condition = 'critical undervoltage — cell damage likely';
+      } else if (voltage < THRESHOLDS.cellVoltage.dischargeMin) {
+        severity = underLoad ? 2 : 3;
+        condition = underLoad
+          ? 'undervoltage under load — terminate discharge'
+          : 'undervoltage at rest — over-discharge damage risk';
+      } else if (voltage < THRESHOLDS.cellVoltage.level1Low) {
+        severity = 1;
+        condition = 'low cell voltage — recharge soon';
       }
+      if (!severity) continue;
+      detectedAnomalies.push({
+        type: 'cell_voltage_spec',
+        code: voltage > THRESHOLDS.cellVoltage.level1High ? 'over_voltage' : 'under_voltage',
+        time: e.time,
+        timeStr: e.time.toLocaleString(),
+        description: `LEVEL ${severity}: Cell #${cellIdx} ${voltage}mV, ${condition}`,
+        cells: [{ cell: cellIdx, voltage }],
+        value: voltage,
+        severity
+      });
     }
   }
 
-  for (const [ts, e] of dataMap) {
-    const cellVoltages = Object.values(e.cells).filter(v => v != null && v > 1000 && v < 5000);
+  for (const e of sorted) {
+    // Relative cell outliers are diagnostic only after the pack has settled.
+    // Charging/discharging fan-out is normally caused by internal resistance;
+    // extreme active-current spread is handled by the state-aware pack delta
+    // guard below instead of being double-reported as a bad cell.
+    if (e.operatingState !== 'REST') continue;
+    const cellVoltages = Object.values(e.cells).filter(v => v != null && v > 1000 && v <= THRESHOLDS.dataValidation.cellVoltage.max);
 
     if (cellVoltages.length >= 3) {  // Need at least 3 cells for meaningful statistics
       // Calculate mean
@@ -623,7 +594,7 @@ export const processData = (sheets) => {
       const cellEntries2 = Object.entries(e.cells);
       for (let i = 0; i < cellEntries2.length; i++) {
         const [cellIdx, voltage] = cellEntries2[i];
-        if (voltage == null || voltage < 1000 || voltage > 5000) continue;
+        if (voltage == null || voltage < 1000 || voltage > THRESHOLDS.dataValidation.cellVoltage.max) continue;
 
         const zScore = Math.abs((voltage - mean) / stdDev);
         const deviation = voltage - mean;
@@ -689,9 +660,8 @@ export const processData = (sheets) => {
   // Track level 2 faults for compound detection
   let activeLevel2Faults = [];
 
-  for (const [ts, e] of dataMap) {
-    const charging = isCharging(e.current, e.systemState);
-    const discharging = isDischarging(e.current, e.systemState);
+  for (const e of sorted) {
+    const charging = e.operatingState?.startsWith('CHARGING');
     activeLevel2Faults = []; // Reset per timestamp
 
     // ================================================================
@@ -701,11 +671,13 @@ export const processData = (sheets) => {
     for (const issue of validationIssues) {
       detectedAnomalies.push({
         type: issue.type,
+        param: issue.param,
+        value: issue.value,
         time: e.time,
         timeStr: e.time.toLocaleString(),
         description: `DATA VALIDATION: ${issue.message}`,
         cells: [],
-        severity: 3
+        severity: issue.type === 'sensor_fault' ? 1 : 3
       });
     }
 
@@ -784,76 +756,78 @@ export const processData = (sheets) => {
     // ================================================================
     if (e.maxTemp != null) {
       const tempThresh = charging ? THRESHOLDS.tempCharging : THRESHOLDS.tempDischarging;
+      const lowTemp = e.minTemp ?? e.maxTemp;
+      const highTemp = e.maxTemp;
 
       // COMPOUND FAULT: Low temp + Charging = ALWAYS Level 3
-      if (charging && e.maxTemp < COMPOUND_FAULTS.lowTempCharging.tempThreshold) {
+      if (charging && lowTemp < COMPOUND_FAULTS.lowTempCharging.tempThreshold) {
         detectedAnomalies.push({
           type: 'compound_fault',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 3 COMPOUND FAULT: Charging at ${e.maxTemp.toFixed(1)}°C (<0°C) - LITHIUM PLATING RISK - STOP CHARGING IMMEDIATELY`,
+          description: `LEVEL 3 COMPOUND FAULT: Charging with minimum probe at ${lowTemp.toFixed(1)}°C (<0°C) - LITHIUM PLATING RISK - STOP CHARGING IMMEDIATELY`,
           cells: [],
           severity: 3
         });
       }
       // Level 3 - Critical temperature
-      else if (e.maxTemp <= tempThresh.level3Low) {
+      else if (lowTemp <= tempThresh.level3Low) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 3 CRITICAL: Temperature ${e.maxTemp.toFixed(1)}°C ≤${tempThresh.level3Low}°C - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
+          description: `LEVEL 3 CRITICAL: Minimum temperature ${lowTemp.toFixed(1)}°C ≤${tempThresh.level3Low}°C - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
           cells: [],
           severity: 3
         });
-      } else if (e.maxTemp >= tempThresh.level3High) {
+      } else if (highTemp >= tempThresh.level3High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 3 CRITICAL: Temperature ${e.maxTemp.toFixed(1)}°C ≥${tempThresh.level3High}°C - THERMAL RUNAWAY RISK - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
+          description: `LEVEL 3 CRITICAL: Maximum temperature ${highTemp.toFixed(1)}°C ≥${tempThresh.level3High}°C - THERMAL RUNAWAY RISK - ${charging ? 'STOP CHARGING' : 'CUT OFF DISCHARGE'}`,
           cells: [],
           severity: 3
         });
       }
       // Level 2 - Warning
-      else if (e.maxTemp <= tempThresh.level2Low) {
+      else if (lowTemp <= tempThresh.level2Low) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 2 WARNING: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'Risk of lithium plating, pause charging' : 'Limit discharge current'}`,
+          description: `LEVEL 2 WARNING: Minimum temperature ${lowTemp.toFixed(1)}°C - ${charging ? 'Risk of lithium plating, pause charging' : 'Limit discharge current'}`,
           cells: [],
           severity: 2
         });
         activeLevel2Faults.push('temperature_low');
-      } else if (e.maxTemp >= tempThresh.level2High) {
+      } else if (highTemp >= tempThresh.level2High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 2 WARNING: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'Reduce current, activate cooling' : 'Limit discharge current, alert operator'}`,
+          description: `LEVEL 2 WARNING: Maximum temperature ${highTemp.toFixed(1)}°C - ${charging ? 'Reduce current, activate cooling' : 'Limit discharge current, alert operator'}`,
           cells: [],
           severity: 2
         });
         activeLevel2Faults.push('temperature_high');
       }
       // Level 1 - Informational
-      else if (e.maxTemp <= tempThresh.level1Low) {
+      else if (lowTemp <= tempThresh.level1Low) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 1 INFO: Temperature ${e.maxTemp.toFixed(1)}°C - ${charging ? 'At minimum safe charging temp' : 'Reduced performance expected'}`,
+          description: `LEVEL 1 INFO: Minimum temperature ${lowTemp.toFixed(1)}°C - ${charging ? 'At minimum safe charging temp' : 'Reduced performance expected'}`,
           cells: [],
           severity: 1
         });
-      } else if (e.maxTemp >= tempThresh.level1High) {
+      } else if (highTemp >= tempThresh.level1High) {
         detectedAnomalies.push({
           type: 'temperature',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 1 INFO: Temperature ${e.maxTemp.toFixed(1)}°C - Approaching limit, prepare thermal management`,
+          description: `LEVEL 1 INFO: Maximum temperature ${highTemp.toFixed(1)}°C - Approaching limit, prepare thermal management`,
           cells: [],
           severity: 1
         });
@@ -896,11 +870,14 @@ export const processData = (sheets) => {
     }
 
     // ================================================================
-    // CELL VOLTAGE DELTA (IMBALANCE) - PSI 3-level system
+    // CELL VOLTAGE DELTA (IMBALANCE) - operating-state aware thresholds
     // ================================================================
     if (e.cellDiff != null) {
+      const balanceThresholds = getCellBalanceThresholds(e.operatingState, sensitivityPreset);
+      const balanceSeverity = classifyCellImbalance(e.cellDiff, e.operatingState, sensitivityPreset);
       // COMPOUND FAULT: High delta + Low SOC = Level 3
-      if (e.cellDiff > COMPOUND_FAULTS.highDeltaLowSoc.deltaThreshold &&
+      if (e.operatingState === 'REST' &&
+          e.cellDiff > COMPOUND_FAULTS.highDeltaLowSoc.deltaThreshold &&
           e.soc != null && e.soc < COMPOUND_FAULTS.highDeltaLowSoc.socThreshold) {
         detectedAnomalies.push({
           type: 'compound_fault',
@@ -908,40 +885,48 @@ export const processData = (sheets) => {
           timeStr: e.time.toLocaleString(),
           description: `LEVEL 3 COMPOUND FAULT: Cell imbalance ${e.cellDiff}mV + Low SOC ${e.soc?.toFixed(1)}% - HIGH RISK OF CELL REVERSAL`,
           cells: [],
+          value: e.cellDiff,
           severity: 3
         });
       }
       // Level 3 - Critical imbalance
-      else if (e.cellDiff > THRESHOLDS.cellDelta.level3) {
+      else if (balanceSeverity === 3) {
+        const activeCurrent = e.operatingState?.startsWith('CHARGING')
+          || e.operatingState?.startsWith('DISCHARGING');
         detectedAnomalies.push({
           type: 'cell_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 3 CRITICAL: Cell imbalance ${e.cellDiff}mV (>${THRESHOLDS.cellDelta.level3}mV) - Bad cell or connection, risk of reversal`,
+          description: activeCurrent
+            ? `LEVEL 3 CRITICAL: Extreme cell spread ${e.cellDiff}mV in ${e.operatingState} (>${balanceThresholds.critical}mV) exceeds the normal internal-resistance range - Inspect cell voltage sensing and connections`
+            : `LEVEL 3 CRITICAL: Settled-rest cell imbalance ${e.cellDiff}mV (>${balanceThresholds.critical}mV) - Investigate cell health and connections`,
           cells: [],
+          value: e.cellDiff,
           severity: 3
         });
       }
       // Level 2 - Warning
-      else if (e.cellDiff > THRESHOLDS.cellDelta.level2) {
+      else if (balanceSeverity === 2) {
         detectedAnomalies.push({
           type: 'cell_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 2 WARNING: Cell imbalance ${e.cellDiff}mV - Weak cell suspected, limit depth of discharge`,
+          description: `LEVEL 2 WARNING: Cell imbalance ${e.cellDiff}mV in ${e.operatingState} (>${balanceThresholds.warning}mV) - Weak cell suspected, limit depth of discharge`,
           cells: [],
+          value: e.cellDiff,
           severity: 2
         });
         activeLevel2Faults.push('cell_imbalance');
       }
       // Level 1 - Informational
-      else if (e.cellDiff > THRESHOLDS.cellDelta.level1) {
+      else if (balanceSeverity === 1) {
         detectedAnomalies.push({
           type: 'cell_imbalance',
           time: e.time,
           timeStr: e.time.toLocaleString(),
-          description: `LEVEL 1 INFO: Cell imbalance ${e.cellDiff}mV - Minor, BMS balancing should correct`,
+          description: `LEVEL 1 INFO: Cell imbalance ${e.cellDiff}mV in ${e.operatingState} (>${balanceThresholds.info}mV) - Monitor for persistence`,
           cells: [],
+          value: e.cellDiff,
           severity: 1
         });
       }
@@ -950,7 +935,7 @@ export const processData = (sheets) => {
     // ================================================================
     // INSULATION RESISTANCE - PSI 3-level system
     // ================================================================
-    if (e.insulationRes != null && e.insulationRes < THRESHOLDS.insulation.open) {
+    if (e.insulationRes != null && e.insulationRes >= 0 && e.insulationRes < THRESHOLDS.insulation.open) {
       if (e.insulationRes <= THRESHOLDS.insulation.level3) {
         detectedAnomalies.push({
           type: 'insulation',
@@ -993,6 +978,17 @@ export const processData = (sheets) => {
           time: e.time,
           timeStr: e.time.toLocaleString(),
           description: `LEVEL 3 DATA FAULT: SOC ${e.soc.toFixed(1)}% outside valid range 0-100% - Sensor/calibration fault`,
+          cells: [],
+          severity: 3
+        });
+      }
+      // Level 3 - empty/undervoltage cutoff
+      else if (e.soc <= THRESHOLDS.soc.level3Low) {
+        detectedAnomalies.push({
+          type: 'soc',
+          time: e.time,
+          timeStr: e.time.toLocaleString(),
+          description: `LEVEL 3 CRITICAL: SOC ${e.soc.toFixed(1)}% - Undervoltage cutoff reached, stop operation`,
           cells: [],
           severity: 3
         });
@@ -1105,7 +1101,6 @@ export const processData = (sheets) => {
     }
   }
 
-  const sorted = iterativeMergeSort(entriesArray, (a, b) => a.ts - b.ts);
   if (DEBUG) console.log('Time series:', sorted.length, 'entries');
   if (DEBUG) console.log('Anomalies detected:', detectedAnomalies.length);
 
@@ -1149,6 +1144,23 @@ export const processData = (sheets) => {
 
       if (currentState !== (prevState?.severity || 0)) {
         if (currentState > 0) {
+          // A nonzero severity transition belongs to the same fault episode.
+          // Preserve one lifecycle and record the transition instead of
+          // orphaning the previous event.
+          if (prevState?.severity > 0 && prevState.event) {
+            prevState.event.transitions = prevState.event.transitions || [];
+            prevState.event.transitions.push({
+              time: t,
+              from: prevState.severity,
+              to: currentState
+            });
+            if (currentState > prevState.event.severity) {
+              prevState.event.severity = currentState;
+              prevState.event.severityText = trimVal;
+            }
+            activeFaultState.set(key, { ...prevState, severity: currentState });
+            continue;
+          }
           const snapshot = findNearestSnapshot(t.getTime());
 
           // Check for sticking relays to enhance fault name
@@ -1223,7 +1235,7 @@ export const processData = (sheets) => {
 
   // Mark ongoing faults
   const lastTime = sorted[sorted.length - 1]?.time;
-  for (const [key, state] of activeFaultState) {
+  for (const state of activeFaultState.values()) {
     if (state.severity > 0 && state.event && !state.event.endTime && lastTime) {
       state.event.endTime = lastTime;
       state.event.duration = (lastTime.getTime() - state.startTime.getTime()) / 60000;
@@ -1281,11 +1293,29 @@ export const processData = (sheets) => {
       ? null
       : { min: minCellIndex, max: maxCellIndex, count: maxCellIndex - minCellIndex + 1 };
 
-    // Dispatch all analysis state at once (avoids cross-field bugs)
+  const sampleIndexByTs = new Map(sorted.map((sample, index) => [sample.ts, index]));
+  const normalizedAnomalies = detectedAnomalies.map(anomaly => {
+    const ts = anomaly.time instanceof Date ? anomaly.time.getTime() : new Date(anomaly.time).getTime();
+    const sampleIndex = sampleIndexByTs.get(ts);
+    const sample = sampleIndex == null ? null : sorted[sampleIndex];
+    return {
+      ...anomaly,
+      ts,
+      sampleIndex,
+      cells: anomaly.cells || [],
+      operatingState: anomaly.operatingState || sample?.operatingState || 'UNKNOWN'
+    };
+  });
+  const persistentAnomalies = debounceAnomalies(normalizedAnomalies, { sensitivityPreset });
+  const anomalyEvents = consolidateAnomalies(persistentAnomalies, { sensitivityPreset });
+
+  // Dispatch all analysis state at once (avoids cross-field bugs)
   return {
     timeSeries: sorted,
     faultEvents: iterativeMergeSort(faults, (a, b) => b.time - a.time),
-    anomalies: detectedAnomalies,
+    anomalies: anomalyEvents,
+    anomalySampleCount: detectedAnomalies.length,
+    balanceAnalysis,
     deviceInfo: deviceInfoObj,
     cellIndexRange
   };
