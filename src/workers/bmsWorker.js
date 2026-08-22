@@ -1,7 +1,13 @@
 import * as XLSX from 'xlsx';
-import { processData } from '../lib/processData';
+import { processData } from '../lib/processData.js';
 
 let workbook = null;
+let parsedSheets = null;
+
+const MAX_WORKBOOK_SHEETS = 100;
+const MAX_SHEET_ROWS = 250_000;
+const MAX_SHEET_COLUMNS = 512;
+const MAX_PARSED_CELLS = 5_000_000;
 
 const neededTerms = [
   'voltage', '0x9a',
@@ -25,7 +31,7 @@ const shouldKeepSheet = (name) => {
 };
 
 self.onmessage = (event) => {
-  const { type, buffer, name } = event.data || {};
+  const { type, buffer, name, options } = event.data || {};
   try {
     if (type === 'load') {
       const data = new Uint8Array(buffer);
@@ -37,18 +43,47 @@ self.onmessage = (event) => {
         sheetStubs: false
       });
 
-      const sheets = {};
+      if (workbook.SheetNames.length > MAX_WORKBOOK_SHEETS) {
+        throw new Error(`Workbook contains ${workbook.SheetNames.length} sheets; maximum supported is ${MAX_WORKBOOK_SHEETS}.`);
+      }
+
+      const sheets = Object.create(null);
+      let parsedCellBudget = 0;
       for (let i = 0; i < workbook.SheetNames.length; i++) {
         const sheetName = workbook.SheetNames[i];
         if (!shouldKeepSheet(sheetName)) continue;
         const sheet = workbook.Sheets[sheetName];
+        if (sheet?.['!ref']) {
+          const range = XLSX.utils.decode_range(sheet['!ref']);
+          const rowCount = range.e.r - range.s.r + 1;
+          const columnCount = range.e.c - range.s.c + 1;
+          parsedCellBudget += rowCount * columnCount;
+          if (rowCount > MAX_SHEET_ROWS || columnCount > MAX_SHEET_COLUMNS || parsedCellBudget > MAX_PARSED_CELLS) {
+            throw new Error(`Workbook structure exceeds safe analysis limits near sheet "${sheetName}".`);
+          }
+        }
         sheets[sheetName] = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: false });
       }
 
-      const result = processData(sheets);
+      parsedSheets = sheets;
+      const result = processData(parsedSheets, options);
       self.postMessage({
         type: 'loaded',
         sheetNames: workbook.SheetNames,
+        ...result
+      });
+      return;
+    }
+
+    if (type === 'reanalyze') {
+      if (!parsedSheets) {
+        self.postMessage({ type: 'error', message: 'Workbook not loaded yet.' });
+        return;
+      }
+      const result = processData(parsedSheets, options);
+      self.postMessage({
+        type: 'loaded',
+        sheetNames: workbook?.SheetNames || [],
         ...result
       });
       return;

@@ -117,15 +117,20 @@ export const PRODUCT_SPECS = {
 
 // Auto-detect product based on cell count and voltage range
 export function detectProduct(cellCount, avgPackVoltage) {
-  for (const [key, spec] of Object.entries(PRODUCT_SPECS)) {
-    if (spec.totalCells === cellCount) {
-      return { key, spec };
-    }
+  const exactMatches = Object.entries(PRODUCT_SPECS).filter(([, spec]) => spec.totalCells === cellCount);
+  if (exactMatches.length === 1) {
+    const [key, spec] = exactMatches[0];
+    return { key, spec, confidence: 'high' };
   }
-  if (cellCount === 24) {
-    return { key: '80V230Ah', spec: PRODUCT_SPECS['80V230Ah'] };
-  } else if (cellCount === 32) {
-    return { key: '96V230Ah', spec: PRODUCT_SPECS['96V230Ah'] };
+  if (exactMatches.length > 1) {
+    const [key, spec] = exactMatches[0];
+    return { key, spec, confidence: 'low', candidates: exactMatches.map(([candidate]) => candidate) };
+  }
+  if (avgPackVoltage >= 90 || cellCount >= 30) {
+    return { key: '96V230Ah', spec: PRODUCT_SPECS['96V230Ah'], confidence: 'medium' };
+  }
+  if (avgPackVoltage >= 55 || cellCount >= 24) {
+    return { key: '80V230Ah', spec: PRODUCT_SPECS['80V230Ah'], confidence: 'low' };
   }
   return null;
 }
@@ -172,7 +177,7 @@ export const RELAY_NAMES = {
 };
 
 // Get relay config based on cell count and optional 12V AUX flag
-export function getRelayConfig(deviceInfo, cellCount, has12VAux = false) {
+export function getRelayConfig(deviceInfo, cellCount, has12VAux = true) {
   const product = detectProduct(cellCount);
   if (product?.key?.startsWith('96V')) {
     return RELAY_CONFIG_BY_PRODUCT['96V'];

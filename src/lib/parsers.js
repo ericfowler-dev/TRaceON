@@ -2,7 +2,7 @@
 // BMS DATA PARSING UTILITIES
 // =============================================================================
 
-import { THRESHOLDS } from './thresholds';
+import { THRESHOLDS } from './thresholds.js';
 
 // Clean BOM and whitespace from Excel keys
 export const cleanKey = (k) => k ? k.replace(/^\ufeff/, '').trim() : '';
@@ -101,7 +101,7 @@ export const iterativeMergeSort = (arr, compareFn) => {
 };
 
 // Heat map for cell voltages (mV) - Three-level boundary system (PSI v2.0)
-export const getVoltageHeatMap = (voltage, minV, maxV, avgV) => {
+export const getVoltageHeatMap = (voltage) => {
   if (voltage == null) return { bg: 'bg-slate-700/80', text: 'text-slate-400', label: 'NO DATA' };
 
   // Sensor fault or impossible value

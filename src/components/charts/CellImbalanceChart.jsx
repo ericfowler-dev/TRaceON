@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { classifyCellImbalance, getCellBalanceThresholds } from '../../lib/anomalyDetection';
 
 const ChartCard = ({ title, icon, children }) => (
   <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-6">
@@ -14,7 +15,7 @@ const ChartCard = ({ title, icon, children }) => (
   </div>
 );
 
-const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [], relayConfig = {} }) => {
+const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [], relayConfig = {}, sensitivityPreset = 'balanced' }) => {
   if (!active || !payload || !payload.length) return null;
   const data = payload[0].payload;
   const value = data.cellDiff;
@@ -40,23 +41,30 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [],
     if (!isNaN(fullTimeDate.getTime())) {
       const ts = fullTimeDate.getTime();
       activeFaults = faultEvents.filter(f => {
-        if (!f.startTime || typeof f.startTime.getTime !== 'function') return false;
-        const startTs = f.startTime.getTime();
-        const endTs = (f.endTime && typeof f.endTime.getTime === 'function') ? f.endTime.getTime() : Date.now();
+        const faultStart = f.startTime || f.time;
+        if (!faultStart || typeof faultStart.getTime !== 'function') return false;
+        const startTs = faultStart.getTime();
+        const endTs = (f.endTime && typeof f.endTime.getTime === 'function') ? f.endTime.getTime() : Number.POSITIVE_INFINITY;
         return ts >= startTs && ts <= endTs;
       });
     }
   }
 
-  let statusColor = '#10b981';
-  let statusText = 'GOOD';
-  if (value >= 150) {
-    statusColor = '#ef4444';
-    statusText = 'BAD';
-  } else if (value >= 30) {
-    statusColor = '#f59e0b';
-    statusText = 'Monitor';
-  }
+  const severity = classifyCellImbalance(value, data.operatingState, sensitivityPreset);
+  const thresholds = getCellBalanceThresholds(data.operatingState, sensitivityPreset);
+  const activeCurrent = data.operatingState?.startsWith('CHARGING') || data.operatingState?.startsWith('DISCHARGING');
+  const statusColor = severity === 3 ? '#ef4444' : severity === 2 ? '#f97316' : severity === 1 ? '#f59e0b' : '#10b981';
+  const statusText = severity === 3
+    ? 'CRITICAL'
+    : severity === 2
+      ? 'WARNING'
+      : severity === 1
+        ? 'MONITOR'
+        : activeCurrent
+          ? 'NORMAL ACTIVE SPREAD'
+          : data.operatingState === 'REST_PENDING'
+            ? 'SETTLING'
+            : 'GOOD';
 
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 shadow-xl">
@@ -76,6 +84,10 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [],
           }`}>
             {data.systemState || 'Standby'}
           </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-xs">
+          <span className="text-slate-500">Analysis context:</span>
+          <span className="font-mono text-slate-300">{data.operatingState || 'UNKNOWN'} · critical &gt;{thresholds.critical}mV</span>
         </div>
         {faultsAtTime.length > 0 && (
           <div className="border-t border-slate-700 pt-2 mt-2">
@@ -118,7 +130,7 @@ const CellImbalanceTooltip = ({ active, payload, faultEvents, faultMarkers = [],
   );
 };
 
-const CellImbalanceChart = ({ data, faultEvents = [], faultMarkers = [], relayConfig = {} }) => {
+const CellImbalanceChart = ({ data, faultEvents = [], faultMarkers = [], relayConfig = {}, sensitivityPreset = 'balanced' }) => {
   if (!data || data.length === 0) {
     return (
       <ChartCard title="Cell Imbalance (Δ) - Balance Health Monitor" icon={<AlertTriangle className="w-4 h-4 text-red-400" />}>
@@ -137,10 +149,10 @@ const CellImbalanceChart = ({ data, faultEvents = [], faultMarkers = [], relayCo
           <XAxis dataKey="time" stroke="#475569" fontSize={11} tick={{fill: '#475569'}} />
           <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => `${val}mV`} />
 
-          {/* GOOD threshold: <30mV (GREEN) */}
-          <ReferenceLine y={30} label={{ position: 'right', value: 'Good <30mV', fill: '#10b981', fontSize: 10 }} stroke="#10b981" strokeDasharray="3 3" opacity={0.5} />
-          {/* MARGINAL threshold: 30-150mV (YELLOW) */}
-          <ReferenceLine y={150} label={{ position: 'right', value: 'Warning 150mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" />
+          {/* Settled-rest references only; active-current limits are state-aware. */}
+          <ReferenceLine y={20} label={{ position: 'right', value: 'Rest monitor 20mV', fill: '#f59e0b', fontSize: 10 }} stroke="#f59e0b" strokeDasharray="3 3" opacity={0.5} />
+          <ReferenceLine y={35} label={{ position: 'right', value: 'Rest warning 35mV', fill: '#f97316', fontSize: 10 }} stroke="#f97316" strokeDasharray="3 3" opacity={0.65} />
+          <ReferenceLine y={50} label={{ position: 'right', value: 'Rest critical >50mV', fill: '#ef4444', fontSize: 10 }} stroke="#ef4444" strokeDasharray="3 3" opacity={0.8} />
 
           {/* Fault markers - solid line for start, dashed for end */}
           {faultMarkers.map((marker, idx) => (
@@ -161,44 +173,25 @@ const CellImbalanceChart = ({ data, faultEvents = [], faultMarkers = [], relayCo
             cursor={{ stroke: '#06b6d4', strokeWidth: 2, strokeDasharray: '5 5' }}
             wrapperStyle={{ zIndex: 1000 }}
             allowEscapeViewBox={{ x: true, y: true }}
-            content={<CellImbalanceTooltip faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} />}
+            content={<CellImbalanceTooltip faultEvents={faultEvents} faultMarkers={faultMarkers} relayConfig={relayConfig} sensitivityPreset={sensitivityPreset} />}
           />
           {/* Main line */}
           <Line
             type="monotone"
             dataKey="cellDiff"
-            stroke="#10b981"
+            stroke="#06b6d4"
             strokeWidth={3}
             dot={false}
             name="Δ mV (Max-Min)"
             connectNulls
             isAnimationActive={false}
-            activeDot={{ r: 20, fill: '#10b981', opacity: 0.3 }}
+            activeDot={{ r: 20, fill: '#06b6d4', opacity: 0.3 }}
           />
-          {/* Overlay data with conditional colors - this creates the effect */}
-          {data.map((d, i) => {
-            if (!d.cellDiff) return null;
-            let color = '#10b981'; // Green (GOOD)
-            if (d.cellDiff >= 150) color = '#ef4444'; // Red (BAD)
-            else if (d.cellDiff >= 30) color = '#f59e0b'; // Yellow (MARGINAL)
-
-            return (
-              <Line
-                key={`segment-${i}`}
-                data={[d]}
-                type="monotone"
-                dataKey="cellDiff"
-                stroke={color}
-                strokeWidth={3}
-                dot={false}
-                connectNulls
-                isAnimationActive={false}
-                legendType="none"
-              />
-            );
-          })}
         </LineChart>
       </ResponsiveContainer>
+      <p className="mt-2 text-[11px] text-slate-500">
+        Reference lines apply only after 15 minutes of settled rest. Hover a sample for its operating-state threshold; active-current spread is not colored as a fault unless it exceeds the extreme guard.
+      </p>
     </ChartCard>
   );
 };
