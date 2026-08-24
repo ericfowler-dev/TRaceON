@@ -156,6 +156,17 @@ body {
   cursor: not-allowed;
 }
 
+.state-gap-pattern {
+  background-color: rgba(245, 158, 11, 0.08);
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(245, 158, 11, 0.35) 0,
+    rgba(245, 158, 11, 0.35) 2px,
+    transparent 2px,
+    transparent 7px
+  );
+}
+
 /* Separator line with glow */
 .tron-separator {
   width: 1px;

@@ -28,6 +28,12 @@ import PackSocChart from './components/charts/PackSocChart';
 import CellVoltageChart from './components/charts/CellVoltageChart';
 import CellImbalanceChart from './components/charts/CellImbalanceChart';
 import CellVoltageHeatMaps from './components/CellVoltageHeatMaps';
+import KeySwitchTimeline from './components/charts/KeySwitchTimeline';
+import SystemStateTimeline from './components/charts/SystemStateTimeline';
+import CurrentFlowChart from './components/charts/CurrentFlowChart';
+import {
+  detectDataGaps, findSwitchTransitions, formatSwitchState, getSwitchStateStyle
+} from './lib/visualization';
 
 // =============================================================================
 // DEBUG FLAG - Set to true to enable console logging
@@ -70,11 +76,17 @@ const ChartCard = ({ title, icon, children }) => (
   </div>
 );
 
-const SnapBox = ({ label, value }) => (
+const SnapBox = ({ label, value, valueClassName = 'text-white' }) => (
   <div className="p-2">
     <div className="text-slate-500 text-xs uppercase mb-1">{label}</div>
-    <div className="font-mono text-white text-sm">{value}</div>
+    <div className={`font-mono text-sm ${valueClassName}`}>{value ?? '—'}</div>
   </div>
+);
+
+const SwitchStateBadge = ({ switchId, value }) => (
+  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold ${getSwitchStateStyle(switchId, value)}`}>
+    {formatSwitchState(switchId, value)}
+  </span>
 );
 
 const Row = ({ label, value, highlight }) => (
@@ -333,6 +345,9 @@ const BMSAnalyzer = () => {
     if (selectedDate === 'all') return timeSeries;
     return timeSeries.filter(d => d.dateKey === selectedDate);
   }, [timeSeries, selectedDate]);
+
+  const dataGaps = useMemo(() => detectDataGaps(filteredData), [filteredData]);
+  const switchTransitions = useMemo(() => findSwitchTransitions(filteredData), [filteredData]);
 
   const visibleAnomalies = useMemo(() => anomalies.filter(anomaly => {
     if (anomalySeverityFilter !== 'all' && anomaly.severity !== Number(anomalySeverityFilter)) return false;
@@ -616,13 +631,45 @@ const BMSAnalyzer = () => {
         packV: d.packVoltage,
         current: d.current,
         soc: d.soc,
+        realSoc: d.realSoc,
+        soh: d.soh,
         maxCell: d.maxCellV && d.maxCellV < 5000 ? d.maxCellV : null,
         minCell: d.minCellV && d.minCellV > 1000 ? d.minCellV : null,
         cellDiff: d.cellDiff && d.cellDiff < 2000 ? d.cellDiff : null,
         maxTemp: d.maxTemp != null && d.maxTemp > -40 && d.maxTemp < 150 ? d.maxTemp : null,
         minTemp: d.minTemp != null && d.minTemp > -40 && d.minTemp < 150 ? d.minTemp : null,
+        tempDiff: d.tempDiff,
         systemState: d.systemState,
         operatingState: d.operatingState,
+        sw1: d.sw1,
+        sw2: d.sw2,
+        di1: d.di1,
+        di2: d.di2,
+        wakeupSignal: d.wakeupSignal,
+        heartbeat: d.heartbeat,
+        powerVolt: d.powerVolt,
+        resetSource: d.resetSource,
+        accVoltage: d.accVoltage,
+        integralRatio: d.integralRatio,
+        insulationRes: d.insulationRes,
+        posInsulation: d.posInsulation,
+        negInsulation: d.negInsulation,
+        hvbpos: d.hvbpos,
+        hv1: d.hv1,
+        hv2: d.hv2,
+        hv3: d.hv3,
+        hv4: d.hv4,
+        hv5: d.hv5,
+        relay0: d.relays?.Relay0 == null ? null : (d.relays.Relay0 === 'ON' || d.relays.Relay0 === 'STICKING' ? 1 : 0),
+        relay1: d.relays?.Relay1 == null ? null : (d.relays.Relay1 === 'ON' || d.relays.Relay1 === 'STICKING' ? 1 : 0),
+        relay2: d.relays?.Relay2 == null ? null : (d.relays.Relay2 === 'ON' || d.relays.Relay2 === 'STICKING' ? 1 : 0),
+        relay3: d.relays?.Relay3 == null ? null : (d.relays.Relay3 === 'ON' || d.relays.Relay3 === 'STICKING' ? 1 : 0),
+        relay4: d.relays?.Relay4 == null ? null : (d.relays.Relay4 === 'ON' || d.relays.Relay4 === 'STICKING' ? 1 : 0),
+        relay5: d.relays?.Relay5 == null ? null : (d.relays.Relay5 === 'ON' || d.relays.Relay5 === 'STICKING' ? 1 : 0),
+        accChargedEnergy: d.accChargedEnergy,
+        accDischargedEnergy: d.accDischargedEnergy,
+        chargeReqCurr: d.chargeReqCurr,
+        chargerOutputCurr: d.chargerOutputCurr,
         hasCells,
         ...cellVoltages,
         ...temps
@@ -647,8 +694,21 @@ const BMSAnalyzer = () => {
       console.log('chartData: First entry sample values:', cellKeys.slice(0, 5).map(k => `${k}=${transformed[0][k]}`).join(', '));
     }
 
-    return transformed;
-  }, [filteredData]);
+    if (dataGaps.length === 0) return transformed;
+
+    const gapBreaks = dataGaps.map(gap => {
+      const ts = gap.startTs + (gap.durationMs / 2);
+      const time = new Date(ts);
+      return {
+        ts,
+        time: time.toLocaleTimeString(),
+        fullTime: time.toLocaleString(),
+        isDataGap: true,
+        hasCells: false
+      };
+    });
+    return iterativeMergeSort([...transformed, ...gapBreaks], (a, b) => a.ts - b.ts);
+  }, [filteredData, dataGaps]);
 
   // Apply zoom to chart data (no additional downsampling needed)
   const zoomedChartData = useMemo(() => {
@@ -693,6 +753,43 @@ const BMSAnalyzer = () => {
     return filtered;
   }, [zoomedChartData]);
 
+  const chartSwitchMarkers = useMemo(() => {
+    const points = chartData.filter(point => !point.isDataGap);
+    if (points.length === 0) return [];
+    return switchTransitions.map(transition => {
+      let closest = points[0];
+      let closestDistance = Math.abs(points[0].ts - transition.ts);
+      for (let i = 1; i < points.length; i++) {
+        const distance = Math.abs(points[i].ts - transition.ts);
+        if (distance >= closestDistance) continue;
+        closest = points[i];
+        closestDistance = distance;
+      }
+      return { ...transition, chartTime: closest.time, chartTs: closest.ts };
+    });
+  }, [chartData, switchTransitions]);
+
+  const chartGapRegions = useMemo(() => {
+    const points = chartData.filter(point => !point.isDataGap);
+    if (points.length === 0) return [];
+    const closestPoint = targetTs => {
+      let closest = points[0];
+      let closestDistance = Math.abs(points[0].ts - targetTs);
+      for (let i = 1; i < points.length; i++) {
+        const distance = Math.abs(points[i].ts - targetTs);
+        if (distance >= closestDistance) continue;
+        closest = points[i];
+        closestDistance = distance;
+      }
+      return closest;
+    };
+    return dataGaps.map(gap => ({
+      ...gap,
+      startTime: closestPoint(gap.startTs).time,
+      endTime: closestPoint(gap.endTs).time
+    }));
+  }, [chartData, dataGaps]);
+
   // Detect date changes in chart data for visual markers
   const dateChangeMarkers = useMemo(() => {
     const markers = [];
@@ -710,7 +807,7 @@ const BMSAnalyzer = () => {
           fullDate: d.dateKey
         });
       }
-      prevDate = d.dateKey;
+      if (d.dateKey) prevDate = d.dateKey;
     }
 
     return markers;
@@ -1290,8 +1387,8 @@ const BMSAnalyzer = () => {
                         animationDuration={0}
                       />
                       <Legend />
-                      <Area type="monotone" dataKey="maxCell" stroke="#10b981" fill="url(#gVolt)" name="Max (mV)" connectNulls dot={false} isAnimationActive={false} />
-                      <Area type="monotone" dataKey="minCell" stroke="#06b6d4" fill="none" name="Min (mV)" connectNulls dot={false} isAnimationActive={false} />
+                      <Area type="monotone" dataKey="maxCell" stroke="#10b981" fill="url(#gVolt)" name="Max (mV)" connectNulls={false} dot={false} isAnimationActive={false} />
+                      <Area type="monotone" dataKey="minCell" stroke="#06b6d4" fill="none" name="Min (mV)" connectNulls={false} dot={false} isAnimationActive={false} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </ChartCard>
@@ -1327,6 +1424,10 @@ const BMSAnalyzer = () => {
                     </AreaChart>
                   </ResponsiveContainer>
                 </ChartCard>
+
+                <KeySwitchTimeline data={filteredData} gaps={dataGaps} />
+                <SystemStateTimeline data={filteredData} />
+                <CurrentFlowChart data={chartData} gaps={dataGaps} switchMarkers={switchTransitions} />
               </div>
             )}
 
@@ -1551,7 +1652,14 @@ const BMSAnalyzer = () => {
               </div>
             </div>
 
-            <PackSocChart data={zoomedChartData} dateChangeMarkers={dateChangeMarkers} faultMarkers={faultMarkers} relayConfig={relayConfig} />
+            <PackSocChart
+              data={zoomedChartData}
+              dateChangeMarkers={dateChangeMarkers}
+              faultMarkers={faultMarkers}
+              keySwitchMarkers={chartSwitchMarkers}
+              dataGaps={chartGapRegions}
+              relayConfig={relayConfig}
+            />
 
             <CellVoltageChart
               data={zoomedCellChartData}
@@ -1762,10 +1870,18 @@ const BMSAnalyzer = () => {
                             <SnapBox label="Max Temp" value={f.snapshot.maxTemp != null ? `${fmt(f.snapshot.maxTemp)}°C (${f.snapshot.maxTempId ?? '—'})` : '—'} />
                             <SnapBox label="Min Temp" value={f.snapshot.minTemp != null ? `${fmt(f.snapshot.minTemp)}°C (${f.snapshot.minTempId ?? '—'})` : '—'} />
                             <SnapBox label="Temp Δ" value={f.snapshot.tempDiff != null ? `${fmt(f.snapshot.tempDiff)}°C` : '—'} />
-                            <SnapBox label="SW1" value={f.snapshot.sw1 || '—'} />
-                            <SnapBox label="SW2" value={f.snapshot.sw2 || '—'} />
-                            <SnapBox label="DI1" value={f.snapshot.di1 || '—'} />
-                            <SnapBox label="DI2" value={f.snapshot.di2 || '—'} />
+                            <SnapBox
+                              label="SW1 (Key)"
+                              value={formatSwitchState('sw1', f.snapshot.sw1)}
+                              valueClassName={f.snapshot.sw1 === 1 ? 'text-emerald-300' : 'text-slate-300'}
+                            />
+                            <SnapBox
+                              label="SW2 (Start)"
+                              value={formatSwitchState('sw2', f.snapshot.sw2)}
+                              valueClassName={f.snapshot.sw2 === 1 ? 'text-amber-300' : 'text-slate-300'}
+                            />
+                            <SnapBox label="DI1" value={f.snapshot.di1 ?? '—'} />
+                            <SnapBox label="DI2" value={f.snapshot.di2 ?? '—'} />
                             <SnapBox label="Heartbeat" value={f.snapshot.heartbeat || '—'} />
                             <SnapBox label="Power V" value={f.snapshot.powerVolt ? `${fmt(f.snapshot.powerVolt)}mV` : '—'} />
                             <SnapBox label="Sys Insul" value={formatInsulation(f.snapshot.insulationRes)} />
@@ -2069,9 +2185,12 @@ const BMSAnalyzer = () => {
 
                   {/* Digital Inputs Section */}
                   <div className="border-t border-slate-700 pt-3 mt-1 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-300">SW1 / SW2</span>
-                      <span className="font-mono text-sm font-semibold text-slate-100">{currentSnap.sw1 ?? '—'} / {currentSnap.sw2 ?? '—'}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-slate-300">Key / Start</span>
+                      <span className="flex flex-wrap justify-end gap-2">
+                        <SwitchStateBadge switchId="sw1" value={currentSnap.sw1} />
+                        <SwitchStateBadge switchId="sw2" value={currentSnap.sw2} />
+                      </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-slate-300">DI1 / DI2</span>

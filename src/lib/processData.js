@@ -11,6 +11,7 @@ import {
   annotateOperatingStates, classifyCellImbalance, getCellBalanceThresholds,
   analyzeChargeConvergence, debounceAnomalies, consolidateAnomalies
 } from './anomalyDetection.js';
+import { normalizeBinaryState } from './visualization.js';
 
 const DEBUG = false;
 
@@ -288,10 +289,10 @@ export const processData = (sheets, options = {}) => {
     e.negInsulation = parseOptionalNumber(getVal(row, 'Neg. insulation'));
 
     // Parse SW1, SW2, DI1, DI2 states
-    e.sw1 = getVal(row, 'SW1');
-    e.sw2 = getVal(row, 'SW2');
-    e.di1 = getVal(row, 'DI1');
-    e.di2 = getVal(row, 'DI2');
+    e.sw1 = normalizeBinaryState(getVal(row, 'SW1'));
+    e.sw2 = normalizeBinaryState(getVal(row, 'SW2'));
+    e.di1 = normalizeBinaryState(getVal(row, 'DI1'));
+    e.di2 = normalizeBinaryState(getVal(row, 'DI2'));
 
     // Parse additional system metrics
     e.heartbeat = getVal(row, 'Heartbeat');

@@ -164,6 +164,28 @@ test('processData preserves zero values and combines multi-frame cells', () => {
   assert.equal(result.timeSeries[0].soh, 0);
 });
 
+test('processData normalizes digital switch values for visualization', () => {
+  const result = processData({
+    'System State 0x93': [{
+      Time: '2026/1/1 00:00:00',
+      SW1: 'Close',
+      SW2: '0',
+      DI1: 'ON',
+      DI2: 'Open'
+    }]
+  });
+
+  assert.deepEqual(
+    {
+      sw1: result.timeSeries[0].sw1,
+      sw2: result.timeSeries[0].sw2,
+      di1: result.timeSeries[0].di1,
+      di2: result.timeSeries[0].di2
+    },
+    { sw1: 1, sw2: 0, di1: 1, di2: 0 }
+  );
+});
+
 test('impossible voltage is a sensor event, not a cell-health event', () => {
   const time = '2026/1/1 00:00:00';
   const result = processData({
